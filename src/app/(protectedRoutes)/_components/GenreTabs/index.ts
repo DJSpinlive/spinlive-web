@@ -1,0 +1,1 @@
+export { GenreTabs } from "./GenreTabs";
