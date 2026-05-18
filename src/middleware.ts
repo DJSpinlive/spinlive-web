@@ -40,19 +40,30 @@ export function middleware(request: NextRequest) {
     AUTH_COOKIE_NAMES.refreshToken
   )?.value;
 
-  // Define protected routes (require login)
-  const protectedRoutes = ["/dashboard"];
+  /**
+   * Route groups `(protectedRoutes)` omit the folder name — these URLs require auth.
+   * Keep in sync with `src/app/(protectedRoutes)/...`
+   */
+  const protectedPrefixes = [
+    "/home",
+    "/live",
+    "/profile",
+    "/bookings",
+    "/notifications",
+    "/djs",
+  ] as const;
 
-  // Define auth routes (redirect away if logged in)
-  const authRoutes = ["/sign-in", "/sign-up", "/forgot-password"];
+  /** Covers `/login`, `/login/email-otp`, etc. */
+  const authPrefixes = ["/login", "/signup"] as const;
 
   // Check if current path is a protected route
-  const isProtectedRoute = protectedRoutes.some((route) =>
-    pathname.startsWith(route)
+  const isProtectedRoute = protectedPrefixes.some(
+    (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`)
   );
 
-  // Check if current path is an auth route
-  const isAuthRoute = authRoutes.some((route) => pathname.startsWith(route));
+  const isAuthRoute = authPrefixes.some(
+    (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`)
+  );
 
   // Determine if user has valid session
   let hasValidSession = false;
@@ -68,14 +79,13 @@ export function middleware(request: NextRequest) {
 
   // Protected routes: require valid session
   if (isProtectedRoute && !hasValidSession) {
-    const signInUrl = new URL("/sign-in", request.url);
-    signInUrl.searchParams.set("redirect", pathname);
-    return NextResponse.redirect(signInUrl);
+    const loginUrl = new URL("/login", request.url);
+    loginUrl.searchParams.set("redirect", pathname);
+    return NextResponse.redirect(loginUrl);
   }
 
-  // Auth routes: redirect to /dashboard if already logged in
   if (isAuthRoute && hasValidSession) {
-    return NextResponse.redirect(new URL("/dashboard", request.url));
+    return NextResponse.redirect(new URL("/home", request.url));
   }
 
   return NextResponse.next();

@@ -1,6 +1,5 @@
 "use client";
 
-import Image from "next/image";
 import Link from "next/link";
 
 import {
@@ -11,19 +10,12 @@ import {
   LockClosedIcon,
   ShieldCheckIcon,
 } from "@/components/assets";
+import { RemoteAvatarImage } from "@/components/RemoteAvatarImage/RemoteAvatarImage";
+import { useGetUserQuery } from "@/store/api";
+import type { User } from "@/types/user.types";
 
-const userProfile = {
-  name: "Alex Morgan",
-  username: "@alexmixesfan",
-  avatar:
-    "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?q=80&w=200&auto=format&fit=crop",
-  bio: "A fan-first account for discovering live DJ sets, sending requests, and booking unforgettable events.",
-  stats: {
-    bookings: 8,
-    following: 24,
-    tipsSent: 186,
-  },
-};
+const AVATAR_FALLBACK =
+  "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?q=80&w=200&auto=format&fit=crop";
 
 const settingsItems = [
   {
@@ -56,7 +48,7 @@ const settingsItems = [
     title: "Notifications & live alerts",
     description:
       "Choose when to get notified about favorite DJs, song requests, booking replies, and stream reminders.",
-    href: "/profile/notifications",
+    href: "/notifications",
   },
   {
     id: "privacy",
@@ -69,6 +61,46 @@ const settingsItems = [
 ] as const;
 
 type SettingsItemIcon = (typeof settingsItems)[number]["icon"];
+
+function displayHandle(user: User): string {
+  const name = user.display_name?.trim();
+  if (name) {
+    return `@${name.replace(/\s+/g, "").toLowerCase()}`;
+  }
+  const local = user.email?.split("@")[0]?.toLowerCase();
+  return local ? `@${local}` : "@you";
+}
+
+function displayName(user: User): string {
+  return user.display_name?.trim() || user.email?.split("@")[0] || "Profile";
+}
+
+function StatsRow({ user }: { user: User }) {
+  const bookings = user.bookings_created_count ?? 0;
+  const following = user.following_count ?? 0;
+  const tips = user.tips_sent_count ?? 0;
+
+  return (
+    <div className="mt-6 grid grid-cols-3 divide-x divide-[#1e2536] border-y border-[#1e2536] py-4">
+      <div className="text-center">
+        <p className="text-xs text-[#6b7280]">Bookings</p>
+        <p className="mt-1 text-lg font-semibold text-white">
+          {bookings.toLocaleString()}
+        </p>
+      </div>
+      <div className="text-center">
+        <p className="text-xs text-[#6b7280]">Following</p>
+        <p className="mt-1 text-lg font-semibold text-white">
+          {following.toLocaleString()} DJs
+        </p>
+      </div>
+      <div className="text-center">
+        <p className="text-xs text-[#6b7280]">Tips sent</p>
+        <p className="mt-1 text-lg font-semibold text-white">${tips}</p>
+      </div>
+    </div>
+  );
+}
 
 function SettingsIcon({ icon }: { icon: SettingsItemIcon }) {
   const iconClass = "h-5 w-5";
@@ -108,10 +140,61 @@ function ChevronRightIcon() {
 }
 
 export default function ProfilePage() {
+  const {
+    data: user,
+    isLoading,
+    isError,
+    isFetching,
+    refetch,
+  } = useGetUserQuery();
+
+  if (isLoading && !user) {
+    return (
+      <div className="flex min-h-[50vh] flex-col items-center justify-center gap-3 pb-10">
+        <div className="h-10 w-10 animate-spin rounded-full border-2 border-[#8b5cf6] border-t-transparent" />
+        <p className="text-sm text-[#9ca3af]">Loading your profile…</p>
+      </div>
+    );
+  }
+
+  if (isError || !user) {
+    return (
+      <div className="flex min-h-[50vh] flex-col items-center justify-center gap-4 px-4 pb-10 text-center">
+        <p className="text-lg font-semibold text-white">
+          Could not load profile
+        </p>
+        <p className="max-w-md text-sm text-[#9ca3af]">
+          Check your connection or sign in again, then retry.
+        </p>
+        <button
+          type="button"
+          onClick={() => refetch()}
+          className="rounded-xl bg-[#8b5cf6] px-5 py-2.5 text-sm font-semibold text-white hover:bg-[#7c4ddb]"
+        >
+          Retry
+        </button>
+      </div>
+    );
+  }
+
+  const bioTrimmed = user.bio?.trim();
+  const bioText =
+    bioTrimmed && bioTrimmed.length > 0
+      ? bioTrimmed
+      : "No bio yet — tell others what sets and events you enjoy.";
+
+  const roleLabel =
+    user.role === "dj" ? "DJ" : user.role === "admin" ? "Admin" : "Listener";
+
   return (
     <div className="pb-10">
       <div className="mb-6 flex items-center justify-between">
-        <h1 className="text-2xl font-semibold text-white">Profile</h1>
+        <h1 className="text-2xl font-semibold text-white">
+          Profile
+          {isFetching ? (
+            <span className="ml-2 inline-block h-2 w-2 animate-pulse rounded-full bg-[#8b5cf6]" />
+          ) : null}
+        </h1>
         <button
           type="button"
           className="flex h-10 w-10 items-center justify-center rounded-xl border border-[#1e2536] bg-[#0d1117] transition hover:border-[#2d3548]"
@@ -143,43 +226,28 @@ export default function ProfilePage() {
         <div className="lg:sticky lg:top-6 lg:self-start">
           <div className="rounded-2xl border border-[#1e2536] bg-[#0d1117] p-6">
             <div className="flex flex-col items-center text-center">
-              <Image
-                src={userProfile.avatar}
-                alt={userProfile.name}
+              <RemoteAvatarImage
+                uri={user.avatar_url || ""}
+                fallbackUri={AVATAR_FALLBACK}
+                alt={displayName(user)}
                 width={80}
                 height={80}
                 className="h-20 w-20 rounded-full object-cover ring-2 ring-[#1e2536]"
-                unoptimized
               />
               <h2 className="mt-4 text-xl font-semibold text-white">
-                {userProfile.name}
+                {displayName(user)}
               </h2>
-              <p className="text-sm text-[#6b7280]">{userProfile.username}</p>
+              <p className="text-sm text-[#6b7280]">{displayHandle(user)}</p>
+              <span className="mt-2 rounded-full bg-[#1a2234] px-3 py-0.5 text-xs font-medium text-[#9ca3af]">
+                {roleLabel}
+                {user.kyc_verified ? " · Verified" : ""}
+              </span>
               <p className="mt-2 text-sm leading-relaxed text-[#9ca3af]">
-                {userProfile.bio}
+                {bioText}
               </p>
             </div>
 
-            <div className="mt-6 grid grid-cols-3 divide-x divide-[#1e2536] border-y border-[#1e2536] py-4">
-              <div className="text-center">
-                <p className="text-xs text-[#6b7280]">Bookings</p>
-                <p className="mt-1 text-lg font-semibold text-white">
-                  {userProfile.stats.bookings}
-                </p>
-              </div>
-              <div className="text-center">
-                <p className="text-xs text-[#6b7280]">Following</p>
-                <p className="mt-1 text-lg font-semibold text-white">
-                  {userProfile.stats.following} DJs
-                </p>
-              </div>
-              <div className="text-center">
-                <p className="text-xs text-[#6b7280]">Tips sent</p>
-                <p className="mt-1 text-lg font-semibold text-white">
-                  ${userProfile.stats.tipsSent}
-                </p>
-              </div>
-            </div>
+            <StatsRow user={user} />
 
             <div className="mt-6 flex gap-3">
               <Link

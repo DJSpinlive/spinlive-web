@@ -42,9 +42,12 @@ export function DJCard({ dj }: DJCardProps) {
         )}
       </div>
 
-      <h3 className="text-center text-lg font-semibold text-white">
+      <Link
+        href={`/djs/${dj.id}`}
+        className="block text-center text-lg font-semibold text-white transition hover:text-[#a78bfa]"
+      >
         {dj.name}
-      </h3>
+      </Link>
 
       <p className="mt-1 text-center text-sm text-[#6b7280]">
         {dj.genres.join(" • ")}

@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
+
 import { CalendarIcon, LocationPinIcon } from "@/components/assets";
 import { useGetBookingsQuery } from "@/store/api";
 import type { Booking } from "@/types/bookings.types";
@@ -23,7 +24,9 @@ const tabs: { id: TabType; label: string }[] = [
   { id: "past", label: "Past" },
 ];
 
-function getStatusBadge(status: "confirmed" | "pending" | "cancelled" | "completed") {
+function getStatusBadge(
+  status: "confirmed" | "pending" | "cancelled" | "completed"
+) {
   const styles = {
     confirmed:
       "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30",
@@ -87,7 +90,12 @@ function BookingCard({ booking }: { booking: Booking }) {
           <span className="flex h-4 w-4 flex-shrink-0 items-center justify-center font-medium">
             $
           </span>
-          <span>{formatBookingMoney(booking.finalAmount, booking.currency)}</span>
+          <span>
+            {formatBookingMoney(
+              booking.finalAmount ?? booking.budgetAmount,
+              booking.currency
+            )}
+          </span>
         </div>
       </div>
 
@@ -105,7 +113,9 @@ export default function BookingsPage() {
   const [activeTab, setActiveTab] = useState<TabType>("upcoming");
   const { data: bookings = [], isLoading } = useGetBookingsQuery({});
 
-  const pendingCount = bookings.filter((b) => bookingListTab(b) === "pending").length;
+  const pendingCount = bookings.filter(
+    (b) => bookingListTab(b) === "pending"
+  ).length;
 
   const filteredBookings = bookings.filter((booking) => {
     switch (activeTab) {
@@ -136,6 +146,7 @@ export default function BookingsPage() {
         {tabs.map((tab) => (
           <button
             key={tab.id}
+            type="button"
             onClick={() => setActiveTab(tab.id)}
             className={`rounded-full px-4 py-2 text-sm font-medium transition ${
               activeTab === tab.id
@@ -161,11 +172,15 @@ export default function BookingsPage() {
           </h3>
           <p className="text-sm text-[#6b7280]">
             {isLoading && "Fetching your bookings from the API."}
-            {!isLoading && activeTab === "upcoming" &&
+            {!isLoading &&
+              activeTab === "upcoming" &&
               "You don't have any confirmed bookings yet."}
-            {!isLoading && activeTab === "pending" &&
+            {!isLoading &&
+              activeTab === "pending" &&
               "No bookings are awaiting confirmation."}
-            {!isLoading && activeTab === "past" && "Your past bookings will appear here."}
+            {!isLoading &&
+              activeTab === "past" &&
+              "Your past bookings will appear here."}
           </p>
           {activeTab !== "past" && (
             <Link

@@ -48,7 +48,9 @@ export default function LiveNowPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const { data, isLoading } = useGetStreamsQuery();
 
-  const liveStreams = (data?.live || []).map(mapStreamToCard);
+  const rawLiveStreams = data?.live || [];
+  const totalLiveBroadcasts = rawLiveStreams.length;
+  const liveStreams = rawLiveStreams.map(mapStreamToCard);
 
   const filteredStreams = liveStreams
     .filter((stream) => {
@@ -72,7 +74,9 @@ export default function LiveNowPage() {
         <p className="mt-1 text-[#6b7280]">
           {isLoading
             ? "Loading streams..."
-            : `${liveStreams.length} streams currently live`}
+            : totalLiveBroadcasts === 0
+              ? "Nothing live right now"
+              : `${totalLiveBroadcasts} stream${totalLiveBroadcasts === 1 ? "" : "s"} currently live`}
         </p>
       </div>
 
@@ -120,7 +124,7 @@ export default function LiveNowPage() {
         onGenreChange={setActiveGenre}
       />
 
-      {!isLoading && filteredStreams.length > 0 ? (
+      {filteredStreams.length > 0 ? (
         <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {filteredStreams.map((stream) => (
             <LiveStreamCard key={stream.id} stream={stream} />
@@ -144,12 +148,23 @@ export default function LiveNowPage() {
             </svg>
           </div>
           <h3 className="mt-4 text-lg font-semibold text-white">
-            {isLoading ? "Loading streams..." : "No streams found"}
-          </h3>
-          <p className="mt-1 text-sm text-[#6b7280]">
             {isLoading
-              ? "Fetching live sessions for you."
-              : "Try adjusting your filters or search query"}
+              ? "Loading streams..."
+              : totalLiveBroadcasts === 0
+                ? "No streams available"
+                : "No matching streams"}
+          </h3>
+          <p className="mx-auto mt-2 max-w-md px-6 text-center text-sm text-[#6b7280]">
+            {isLoading && "Fetching live sessions for you."}
+            {!isLoading && totalLiveBroadcasts === 0 && (
+              <>
+                No DJs are broadcasting live right now. You can browse past
+                activity from your DJs or explore bookings instead.
+              </>
+            )}
+            {!isLoading &&
+              totalLiveBroadcasts > 0 &&
+              "Try adjusting your genre filter or search to find live sessions."}
           </p>
         </div>
       )}

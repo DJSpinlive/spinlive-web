@@ -1,4 +1,4 @@
-import type { GetDjReviewsResponse } from "@/types/dj.types";
+import type { DjReview, GetDjReviewsResponse } from "@/types/dj.types";
 import {
   DiscoverDjsParams,
   DiscoverDjsResponse,
@@ -18,6 +18,15 @@ export const djApi = baseSlice.injectEndpoints({
         method: "GET",
         params: removeEmptyParams(params) as Record<string, unknown>,
       }),
+      /** Accepts `{ djs }` or raw `User[]` from `/users/djs`. */
+      transformResponse: (response: User[] | DiscoverDjsResponse) => {
+        if (Array.isArray(response)) {
+          return { djs: response };
+        }
+        return {
+          djs: Array.isArray(response?.djs) ? response.djs : [],
+        };
+      },
       providesTags: ["DjsList"],
     }),
 
@@ -56,16 +65,28 @@ export const djApi = baseSlice.injectEndpoints({
         url: `${BASE_PATHS.USER_SERVICE}/djs/${djId}/reviews`,
         method: "GET",
       }),
+      transformResponse: (
+        raw: DjReview[] | { reviews?: DjReview[] }
+      ): GetDjReviewsResponse => {
+        if (Array.isArray(raw)) return raw;
+        if (raw && typeof raw === "object" && Array.isArray(raw.reviews)) {
+          return raw.reviews;
+        }
+        return [];
+      },
       providesTags: (_result, _error, { djId }) => [
         { type: "DjReviews", id: djId },
       ],
     }),
 
-    reviewDj: builder.mutation<void, { djId: string; review: string }>({
-      query: ({ djId, review }) => ({
+    reviewDj: builder.mutation<
+      void,
+      { djId: string; rating: number; comment: string }
+    >({
+      query: ({ djId, rating, comment }) => ({
         url: `${BASE_PATHS.USER_SERVICE}/djs/${djId}/reviews`,
         method: "POST",
-        body: { review },
+        body: { rating, comment },
       }),
       invalidatesTags: (_result, _error, { djId }) => [
         { type: "DjsDetails", id: djId },

@@ -2,8 +2,8 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useParams } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useParams, useRouter } from "next/navigation";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import {
   useCreateBookingMutation,
@@ -11,7 +11,14 @@ import {
 } from "@/store/api/bookingsApi";
 import { useDjDetailQuery } from "@/store/api/djApi";
 import { useGetUserQuery } from "@/store/api/userApi";
-import type { AvailabilityWindow } from "@/types/bookings.types";
+import {
+  addMinutesToLocalDate,
+  bookingLocalStartFromEventIsoAndMinuteOfDay,
+  buildAvailabilitySlotPicks,
+  DEFAULT_BOOKING_SLOT_START_INTERVAL_MINUTES,
+  formatLocalTimeHHMMSS,
+  inferLocationType,
+} from "@/utilities/booking-helpers";
 import { getErrorMessage } from "@/utilities/helpers";
 
 const eventTypes = [
@@ -30,128 +37,125 @@ const durations = [
   { value: "6", label: "6+ Hours" },
 ];
 
-const defaultAvailableSlots = [
-  "10:00 AM",
-  "11:00 AM",
-  "12:00 PM",
-  "01:00 PM",
-  "02:00 PM",
-  "03:00 PM",
-  "04:00 PM",
-  "05:00 PM",
-  "06:00 PM",
-  "07:00 PM",
-  "08:00 PM",
-  "09:00 PM",
-];
-
-function toTimeParts(time: string) {
-  const [clock, period] = time.split(" ");
-  const [hh, mm] = clock.split(":").map(Number);
-  const isPm = period?.toUpperCase() === "PM";
-  let hour = hh % 12;
-  if (isPm) hour += 12;
-  return { hour, minute: mm || 0, second: 0, nano: 0 };
-}
-
-interface SlotOption {
-  label: string;
-  isBooked: boolean;
-}
-
 export default function BookDJPage() {
+  const router = useRouter();
   const params = useParams<{ id: string }>();
   const djId = params?.id || "";
   const [eventType, setEventType] = useState("private");
   const [date, setDate] = useState("");
-  const [time, setTime] = useState("");
+  const [timeMinutes, setTimeMinutes] = useState<number | null>(null);
   const [duration, setDuration] = useState("4");
-  const [location, setLocation] = useState("");
+  const [venueName, setVenueName] = useState("");
+  const [venueAddress, setVenueAddress] = useState("");
+  const [genreNotes, setGenreNotes] = useState("");
+  const genreNotesSeededRef = useRef(false);
   const [requests, setRequests] = useState("");
   const [submitError, setSubmitError] = useState<string | null>(null);
-  const [submitSuccess, setSubmitSuccess] = useState<string | null>(null);
+  const [bookingSuccessModalOpen, setBookingSuccessModalOpen] = useState(false);
   const { data: dj } = useDjDetailQuery(djId, { skip: !djId });
   const { data: me } = useGetUserQuery();
-  const { data: availability } = useGetBookingAvailabilityQuery(
-    { djId, date },
-    { skip: !djId || !date }
-  );
+  const {
+    data: availability,
+    isFetching: availabilityFetching,
+    isLoading: availabilityLoading,
+  } = useGetBookingAvailabilityQuery({ djId, date }, { skip: !djId || !date });
   const [createBooking, { isLoading: isCreatingBooking }] =
     useCreateBookingMutation();
 
   const hourlyRate = dj?.hourly_rate || 0;
   const hours = parseInt(duration, 10) || 0;
+  const bookingDurationMinutes = Math.max(
+    hours * 60,
+    DEFAULT_BOOKING_SLOT_START_INTERVAL_MINUTES
+  );
   const subtotal = hourlyRate * hours;
   const serviceFee = 30;
   const total = subtotal + serviceFee;
 
-  const slotsForSelectedDate = useMemo<SlotOption[]>(() => {
-    if (!date) return [];
-    const apiSlots = availability?.availableSlots?.map(
-      (slot: AvailabilityWindow) => {
-        const [h, m] = slot.startTime.split(":").map(Number);
-        const d = new Date();
-        d.setHours(h || 0, m || 0, 0, 0);
-        return {
-          label: d.toLocaleTimeString("en-US", {
-            hour: "2-digit",
-            minute: "2-digit",
-            hour12: true,
-          }),
-          isBooked: false,
-        };
-      }
-    );
-    if (apiSlots?.length) return apiSlots;
-    return defaultAvailableSlots.map((slot) => ({
-      label: slot,
-      isBooked: false,
-    }));
-  }, [availability?.availableSlots, date]);
+  const slotsForSelectedDate = useMemo(
+    () =>
+      buildAvailabilitySlotPicks(availability, {
+        bookingDurationMinutes,
+        slotStartIntervalMinutes: DEFAULT_BOOKING_SLOT_START_INTERVAL_MINUTES,
+      }),
+    [availability, bookingDurationMinutes]
+  );
 
   useEffect(() => {
-    if (!date || !time) return;
+    setTimeMinutes(null);
+  }, [date]);
+
+  useEffect(() => {
+    genreNotesSeededRef.current = false;
+  }, [djId]);
+
+  useEffect(() => {
+    if (!dj?.genres?.length || genreNotesSeededRef.current) return;
+    setGenreNotes(dj.genres.join(", "));
+    genreNotesSeededRef.current = true;
+  }, [dj?.genres]);
+
+  useEffect(() => {
+    if (!date || timeMinutes == null) return;
 
     const selectedSlot = slotsForSelectedDate.find(
-      (slot) => slot.label === time
+      (slot) => slot.startMinutesFromMidnight === timeMinutes
     );
-    if (!selectedSlot || selectedSlot.isBooked) {
-      setTime("");
+    if (!selectedSlot || selectedSlot.disabled) {
+      setTimeMinutes(null);
     }
-  }, [date, slotsForSelectedDate, time]);
+  }, [date, slotsForSelectedDate, timeMinutes]);
+
+  const selectedSlotLabel =
+    timeMinutes != null
+      ? slotsForSelectedDate.find(
+          (s) => s.startMinutesFromMidnight === timeMinutes
+        )?.label
+      : undefined;
 
   const handleConfirmBooking = async () => {
-    if (!me?.id || !djId || !date || !time || !location) {
-      setSubmitError("Select date, time, and location to continue.");
+    if (
+      !me?.id ||
+      !djId ||
+      !date ||
+      timeMinutes == null ||
+      selectedSlotLabel == null ||
+      !venueName.trim() ||
+      !venueAddress.trim()
+    ) {
+      setSubmitError(
+        "Enter venue name, venue address/link, date, and time to continue."
+      );
       return;
     }
 
     setSubmitError(null);
-    setSubmitSuccess(null);
 
     try {
-      const start = toTimeParts(time);
+      const startAt = bookingLocalStartFromEventIsoAndMinuteOfDay(
+        date,
+        timeMinutes
+      );
+      const endAt = addMinutesToLocalDate(startAt, bookingDurationMinutes);
+
       await createBooking({
         fanId: me.id,
         djId,
         eventType,
         eventDate: date,
-        startTime: start,
-        endTime: {
-          ...start,
-          hour: (start.hour + hours) % 24,
-        },
+        startTime: formatLocalTimeHHMMSS(startAt),
+        endTime: formatLocalTimeHHMMSS(endAt),
         timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC",
-        locationType: "venue",
-        venueName: location,
-        venueAddress: location,
-        genreNotes: dj?.genres?.join(", ") || "",
-        specialRequests: requests,
+        locationType: inferLocationType(venueAddress),
+        venueName: venueName.trim(),
+        venueAddress: venueAddress.trim(),
+        genreNotes: genreNotes.trim(),
+        specialRequests: requests.trim(),
         guestCount: 1,
         budgetAmount: total,
         currency: "USD",
       }).unwrap();
-      setSubmitSuccess("Booking request submitted successfully.");
+      setBookingSuccessModalOpen(true);
     } catch (error: unknown) {
       setSubmitError(
         getErrorMessage(error, {
@@ -245,7 +249,7 @@ export default function BookDJPage() {
                       Selected Time
                     </p> */}
                     <p className="mt-1 text-sm text-white">
-                      {time || "Choose a time slot below"}
+                      {selectedSlotLabel || "Choose a time slot below"}
                     </p>
                   </div>
                 </div>
@@ -254,30 +258,55 @@ export default function BookDJPage() {
                   <p className="mt-3 text-xs text-[#6b7280]">
                     Select a date to view available and booked DJ time slots.
                   </p>
+                ) : availabilityLoading ||
+                  (availabilityFetching && !availability) ? (
+                  <p className="mt-3 text-sm text-[#9ca3af]">
+                    Loading availability…
+                  </p>
+                ) : slotsForSelectedDate.length === 0 ? (
+                  <p className="mt-3 text-sm text-[#9ca3af]">
+                    No availability for this date. Choose another day or contact
+                    the DJ.
+                  </p>
                 ) : (
                   <div className="mt-3 space-y-3">
-                    <div className="flex items-center gap-4 text-xs text-[#9ca3af]">
+                    <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-[#9ca3af]">
                       <span className="inline-flex items-center gap-1.5">
                         <span className="h-2.5 w-2.5 rounded-full bg-[#8b5cf6]" />
                         Available
                       </span>
                       <span className="inline-flex items-center gap-1.5">
-                        <span className="h-2.5 w-2.5 rounded-full bg-[#374151]" />
+                        <span className="h-2.5 w-2.5 rounded-full bg-[#78350f]" />
                         Booked
+                      </span>
+                      <span className="inline-flex items-center gap-1.5">
+                        <span className="h-2.5 w-2.5 rounded-full bg-[#581c87]" />
+                        Blocked
                       </span>
                     </div>
 
                     <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
                       {slotsForSelectedDate.map((slot) => (
                         <button
-                          key={slot.label}
+                          key={slot.startMinutesFromMidnight}
                           type="button"
-                          disabled={slot.isBooked}
-                          onClick={() => setTime(slot.label)}
+                          disabled={slot.disabled}
+                          title={
+                            slot.disabledReason === "booked"
+                              ? "Overlaps a booked slot"
+                              : slot.disabledReason === "blocked"
+                                ? "Overlaps a blocked time"
+                                : undefined
+                          }
+                          onClick={() =>
+                            setTimeMinutes(slot.startMinutesFromMidnight)
+                          }
                           className={`rounded-lg px-3 py-2 text-sm transition ${
-                            slot.isBooked
-                              ? "cursor-not-allowed border border-[#293041] bg-[#111827] text-[#6b7280]"
-                              : time === slot.label
+                            slot.disabled
+                              ? slot.disabledReason === "blocked"
+                                ? "cursor-not-allowed border border-[#4c1d95] bg-[#1e0936] text-[#a78bfa]"
+                                : "cursor-not-allowed border border-[#293041] bg-[#111827] text-[#6b7280]"
+                              : timeMinutes === slot.startMinutesFromMidnight
                                 ? "bg-[#8b5cf6] text-white"
                                 : "border border-[#1e2536] bg-[#070b12] text-[#d1d5db] hover:border-[#3a4a69]"
                           }`}
@@ -314,20 +343,46 @@ export default function BookDJPage() {
 
               <div>
                 <p className="mb-3 block text-sm font-medium text-white">
-                  Location
+                  Venue name
+                </p>
+                <input
+                  type="text"
+                  placeholder="e.g. Main Hall, Rooftop Lounge"
+                  value={venueName}
+                  onChange={(e) => setVenueName(e.target.value)}
+                  className="h-12 w-full rounded-xl border border-[#1e2536] bg-[#070b12] px-4 text-sm text-white outline-none transition placeholder:text-[#4b5563] focus:border-[#6366f1]"
+                />
+              </div>
+
+              <div>
+                <p className="mb-3 block text-sm font-medium text-white">
+                  Venue address or stream link
                 </p>
                 <div className="relative">
                   <input
                     type="text"
-                    placeholder="Enter venue address or link"
-                    value={location}
-                    onChange={(e) => setLocation(e.target.value)}
+                    placeholder="Address, or Zoom / Meet / Teams link"
+                    value={venueAddress}
+                    onChange={(e) => setVenueAddress(e.target.value)}
                     className="h-12 w-full rounded-xl border border-[#1e2536] bg-[#070b12] px-4 pr-10 text-sm text-white outline-none transition placeholder:text-[#4b5563] focus:border-[#6366f1]"
                   />
                   <span className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-[#6b7280]">
                     📍
                   </span>
                 </div>
+              </div>
+
+              <div>
+                <p className="mb-3 block text-sm font-medium text-white">
+                  Genre notes
+                </p>
+                <textarea
+                  placeholder="Describe preferred genres or vibe..."
+                  value={genreNotes}
+                  onChange={(e) => setGenreNotes(e.target.value)}
+                  rows={3}
+                  className="w-full resize-none rounded-xl border border-[#1e2536] bg-[#070b12] px-4 py-3 text-sm text-white outline-none transition placeholder:text-[#4b5563] focus:border-[#6366f1]"
+                />
               </div>
 
               <div>
@@ -375,12 +430,6 @@ export default function BookDJPage() {
                 {submitError}
               </p>
             )}
-            {submitSuccess && (
-              <p className="mt-4 rounded-lg border border-emerald-400/40 bg-emerald-500/10 px-3 py-2 text-sm text-emerald-300">
-                {submitSuccess}
-              </p>
-            )}
-
             <button
               type="button"
               onClick={handleConfirmBooking}
@@ -396,6 +445,54 @@ export default function BookDJPage() {
           </div>
         </div>
       </div>
+
+      {bookingSuccessModalOpen ? (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="booking-success-modal-title"
+        >
+          <button
+            type="button"
+            className="absolute inset-0 cursor-default bg-transparent"
+            aria-label="Close dialog backdrop"
+            onClick={() => router.push("/bookings")}
+          />
+          <div className="relative z-[1] w-full max-w-md rounded-2xl border border-[#1e2536] bg-[#11193e] p-6 shadow-xl">
+            <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-emerald-500/15 text-2xl">
+              ✓
+            </div>
+            <h2
+              id="booking-success-modal-title"
+              className="text-lg font-bold text-white"
+            >
+              Request sent
+            </h2>
+            <p className="mt-2 text-sm leading-relaxed text-[#c7d0ff]">
+              Your booking request was submitted. You won&apos;t be charged
+              until the DJ confirms. You can track status anytime in your
+              bookings.
+            </p>
+            <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:justify-end">
+              <button
+                type="button"
+                onClick={() => setBookingSuccessModalOpen(false)}
+                className="rounded-xl border border-[#1e2536] bg-[#0d1117] px-5 py-2.5 text-sm font-semibold text-[#c7d0ff] transition hover:border-[#2d3548] hover:bg-[#141a24]"
+              >
+                Close
+              </button>
+              <button
+                type="button"
+                onClick={() => router.push("/bookings")}
+                className="rounded-xl bg-[#8b5cf6] px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-[#7c4ddb]"
+              >
+                Go to bookings
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

@@ -18,8 +18,6 @@ export const authApi = baseSlice.injectEndpoints({
       query: (body: RegisterUserRequest) => ({
         url: `${BASE_PATHS.AUTH_SERVICE}/register`,
         method: "POST",
-        // RTK Query accepts serializable body; type is narrowed by mutation generic.
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
         body,
       }),
     }),
@@ -27,7 +25,6 @@ export const authApi = baseSlice.injectEndpoints({
       query: (user: LoginUserRequest) => ({
         url: `${BASE_PATHS.AUTH_SERVICE}/login`,
         method: "POST",
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
         body: user,
       }),
     }),
@@ -38,7 +35,6 @@ export const authApi = baseSlice.injectEndpoints({
       query: (body: VerifyAccountRequest) => ({
         url: `${BASE_PATHS.AUTH_SERVICE}/verify`,
         method: "POST",
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
         body,
       }),
     }),

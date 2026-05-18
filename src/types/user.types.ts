@@ -3,6 +3,8 @@ import { AvailabilityWindow } from "./bookings.types";
 export interface User {
   id: string;
   email: string;
+  /** Public handle — present when `/me` returns it. */
+  username?: string | null;
   display_name: string | null;
   bio: string | null;
   avatar_url: string | null;
@@ -56,12 +58,9 @@ export interface DiscoverDjsParams {
   offset?: number; // minimum: 0
 }
 
+/** Normalized client shape — API returns either a raw DJ array or `{ djs: [...] }` (no pagination metadata). */
 export interface DiscoverDjsResponse {
   djs: User[];
-  total?: number;
-  limit?: number;
-  offset?: number;
-  has_more?: boolean;
 }
 
 export interface Genre {

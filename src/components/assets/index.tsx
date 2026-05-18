@@ -8,7 +8,10 @@ export {
   EditPencilIcon,
   LocationPinIcon,
   LockClosedIcon,
+  RatingStarOutlineIcon,
+  RatingStarSolidIcon,
   SearchIconOutline,
   ShieldCheckIcon,
   StarIcon,
+  VerifiedCircleIcon,
 } from "./AppIcons";

@@ -22,7 +22,7 @@ export interface Booking {
   djId: string;
   endUserDisplayName: string;
   djDisplayName: string;
-  djAvatarUrl: string;
+  djAvatarUrl: string | null;
   status:
     | "pending_dj_review"
     | "awaiting_end_user_confirmation"
@@ -34,35 +34,27 @@ export interface Booking {
     | "cancelled_by_admin"
     | "completed";
   eventType: string;
-  eventDate: string; // e.g., "2026-05-05"
-  startTime: {
-    hour: number;
-    minute: number;
-    second: number;
-    nano: number;
-  };
-  endTime: {
-    hour: number;
-    minute: number;
-    second: number;
-    nano: number;
-  };
+  eventDate: string;
+  /** Local time on `eventDate`, e.g. `"13:00:00"`. */
+  startTime: string;
+  /** Local time on `eventDate`, e.g. `"17:00:00"`. */
+  endTime: string;
   timezone: string;
-  locationType: "virtual" | "in_person";
+  locationType: "virtual" | "venue" | "hybrid" | "in_person";
   venueName: string;
   venueAddress: string;
-  genreNotes: string;
-  specialRequests: string;
+  genreNotes: string | null;
+  specialRequests: string | null;
   guestCount: number;
   budgetAmount: number;
-  quotedAmount: number;
-  finalAmount: number;
-  depositAmount: number;
+  quotedAmount: number | null;
+  finalAmount: number | null;
+  depositAmount: number | null;
   currency: string;
-  cancellationReason: string;
-  lastStatusNote: string;
-  createdAt: string; // ISO date string
-  updatedAt: string; // ISO date string
+  cancellationReason: string | null;
+  lastStatusNote: string | null;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface CreateBookingRequest {
@@ -70,18 +62,10 @@ export interface CreateBookingRequest {
   djId: string;
   eventType: string;
   eventDate: string; // e.g., "2026-05-05"
-  startTime: {
-    hour: number;
-    minute: number;
-    second: number;
-    nano: number;
-  };
-  endTime: {
-    hour: number;
-    minute: number;
-    second: number;
-    nano: number;
-  };
+  /** Local time on `eventDate`, e.g. `"18:00:00"`. */
+  startTime: string;
+  /** Local time on `eventDate`, e.g. `"22:00:00"`. */
+  endTime: string;
   timezone: string;
   locationType: "virtual" | "venue" | "hybrid";
   venueName: string;
