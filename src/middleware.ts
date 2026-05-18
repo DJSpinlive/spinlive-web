@@ -77,6 +77,14 @@ export function middleware(request: NextRequest) {
     }
   }
 
+  // Landing `/`: signed-in → home, otherwise login (parity with auth routes + protected gate)
+  if (pathname === "/") {
+    if (hasValidSession) {
+      return NextResponse.redirect(new URL("/home", request.url));
+    }
+    return NextResponse.redirect(new URL("/login", request.url));
+  }
+
   // Protected routes: require valid session
   if (isProtectedRoute && !hasValidSession) {
     const loginUrl = new URL("/login", request.url);

@@ -1,10 +1,7 @@
-import Link from "next/link";
-import React from "react";
-
-const page = () => (
-  <div>
-    <Link href="/login">Login</Link>
-  </div>
-);
-
-export default page;
+/**
+ * `/` is handled in `middleware.ts`: signed-in → `/home`, otherwise `/login`.
+ * This component should not normally render.
+ */
+export default function RootPage() {
+  return null;
+}
