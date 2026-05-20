@@ -1,5 +1,6 @@
 "use client";
 
+import { SlidersHorizontal } from "lucide-react";
 import Link from "next/link";
 
 import {
@@ -18,6 +19,14 @@ const AVATAR_FALLBACK =
   "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?q=80&w=200&auto=format&fit=crop";
 
 const settingsItems = [
+  {
+    id: "preferences",
+    icon: "sliders",
+    title: "Preferences",
+    description:
+      "Favorite genres, discovery defaults for DJs and streams, and booking budget.",
+    href: "/profile/preferences",
+  },
   {
     id: "verification",
     icon: "shield-check",
@@ -106,6 +115,8 @@ function SettingsIcon({ icon }: { icon: SettingsItemIcon }) {
   const iconClass = "h-5 w-5";
 
   switch (icon) {
+    case "sliders":
+      return <SlidersHorizontal className={iconClass} />;
     case "shield-check":
       return <ShieldCheckIcon className={iconClass} />;
     case "credit-card":

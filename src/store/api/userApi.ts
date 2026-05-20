@@ -1,4 +1,6 @@
 import {
+  Genre,
+  UpdateGenrePreferencesRequest,
   UpdateUserRequest,
   UploadUserAvatarResponse,
   User,
@@ -26,6 +28,29 @@ function normalizeMePayload(raw: unknown): User {
     }
   }
   return raw as User;
+}
+
+function isGenreLike(x: unknown): x is Genre {
+  if (!x || typeof x !== "object") return false;
+  const o = x as Record<string, unknown>;
+  return typeof o.slug === "string";
+}
+
+/** Accept `Genre[]` or `{ genres }` / `{ data }` wrappers. */
+function normalizeGenrePreferencesResponse(raw: unknown): Genre[] {
+  if (!raw) return [];
+  if (Array.isArray(raw)) {
+    return raw.filter(isGenreLike) as Genre[];
+  }
+  if (typeof raw === "object") {
+    const o = raw as Record<string, unknown>;
+    const nested = [o.genres, o.data, o.preferences, o.items];
+    const list = nested.find((n): n is unknown[] => Array.isArray(n));
+    if (list) {
+      return list.filter(isGenreLike) as Genre[];
+    }
+  }
+  return [];
 }
 
 export const userApi = baseSlice.injectEndpoints({
@@ -74,6 +99,27 @@ export const userApi = baseSlice.injectEndpoints({
       },
       invalidatesTags: ["User"],
     }),
+
+    getGenrePreferences: builder.query<Genre[], void>({
+      query: () => `${BASE_PATHS.USER_SERVICE}/me/genre-preferences`,
+      transformResponse: (response: unknown) =>
+        normalizeGenrePreferencesResponse(response),
+      providesTags: ["GenrePreferences"],
+    }),
+
+    updateGenrePreferences: builder.mutation<
+      Genre[],
+      UpdateGenrePreferencesRequest
+    >({
+      query: (body) => ({
+        url: `${BASE_PATHS.USER_SERVICE}/me/genre-preferences`,
+        method: "PUT",
+        body,
+      }),
+      transformResponse: (response: unknown) =>
+        normalizeGenrePreferencesResponse(response),
+      invalidatesTags: ["GenrePreferences"],
+    }),
   }),
 });
 
@@ -81,4 +127,6 @@ export const {
   useGetUserQuery,
   useUpdateUserMutation,
   useUploadUserAvatarMutation,
+  useGetGenrePreferencesQuery,
+  useUpdateGenrePreferencesMutation,
 } = userApi;
