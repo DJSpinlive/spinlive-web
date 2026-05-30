@@ -24,7 +24,7 @@ export function Navbar() {
             S
           </span>
           <span className="text-lg font-semibold tracking-tight text-white">
-            SpinSync
+            SpinLive{" "}
           </span>
         </Link>
 
