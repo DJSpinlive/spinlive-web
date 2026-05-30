@@ -272,8 +272,12 @@ export default function BookDJPage() {
                   <div className="mt-3 space-y-3">
                     <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-[#9ca3af]">
                       <span className="inline-flex items-center gap-1.5">
-                        <span className="h-2.5 w-2.5 rounded-full bg-[#8b5cf6]" />
+                        <span className="h-2.5 w-2.5 rounded-full border border-[#1e2536] bg-[#070b12]" />
                         Available
+                      </span>
+                      <span className="inline-flex items-center gap-1.5">
+                        <span className="h-2.5 w-2.5 rounded-full bg-[#8b5cf6]" />
+                        Selected
                       </span>
                       <span className="inline-flex items-center gap-1.5">
                         <span className="h-2.5 w-2.5 rounded-full bg-[#78350f]" />
@@ -304,8 +308,8 @@ export default function BookDJPage() {
                           className={`rounded-lg px-3 py-2 text-sm transition ${
                             slot.disabled
                               ? slot.disabledReason === "blocked"
-                                ? "cursor-not-allowed border border-[#4c1d95] bg-[#1e0936] text-[#a78bfa]"
-                                : "cursor-not-allowed border border-[#293041] bg-[#111827] text-[#6b7280]"
+                                ? "cursor-not-allowed border border-[#6b21a8] bg-[#581c87] text-[#e9d5ff]"
+                                : "cursor-not-allowed border border-[#92400e] bg-[#78350f] text-[#fde68a]"
                               : timeMinutes === slot.startMinutesFromMidnight
                                 ? "bg-[#8b5cf6] text-white"
                                 : "border border-[#1e2536] bg-[#070b12] text-[#d1d5db] hover:border-[#3a4a69]"
