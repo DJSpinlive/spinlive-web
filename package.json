@@ -33,6 +33,7 @@
     "gsap": "^3.13.0",
     "js-cookie": "^3.0.5",
     "jwt-decode": "^4.0.0",
+    "livekit-client": "^2.20.0",
     "lottie-react": "^2.4.1",
     "lucide-react": "^0.544.0",
     "motion": "^12.23.24",

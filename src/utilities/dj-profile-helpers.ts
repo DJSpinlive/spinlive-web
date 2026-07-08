@@ -57,7 +57,7 @@ export function summarizeAvailability(dj: User): string | null {
   if (!Array.isArray(av) || av.length === 0) return null;
   const first = av[0];
   if (!first || typeof first !== "object") return null;
-  const o = first as Record<string, unknown>;
+  const o = first as unknown as Record<string, unknown>;
   if (typeof o.label === "string" && o.label.trim()) return o.label.trim();
   if (typeof o.summary === "string" && o.summary.trim())
     return o.summary.trim();

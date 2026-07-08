@@ -15,4 +15,5 @@ export const BASE_PATHS = {
   AUTH_SERVICE: "/auth",
   NOTIFICATION_SERVICE: "/notification",
   BOOKINGS_SERVICE: "/bookings",
+  CHAT_SERVICE: "/chat",
 };
