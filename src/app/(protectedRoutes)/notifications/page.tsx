@@ -3,6 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useState } from "react";
+
 import {
   BadgeCheckIcon,
   BellIcon,
@@ -77,7 +78,8 @@ const mockNotifications: Notification[] = [
     id: "5",
     type: "platform_update",
     title: "New House DJs",
-    message: "We've added 5 new featured DJs in the House genre. Check them out!",
+    message:
+      "We've added 5 new featured DJs in the House genre. Check them out!",
     time: "2d ago",
     isRead: true,
     actionUrl: "/djs",
@@ -119,11 +121,7 @@ function NotificationIcon({ type }: { type: NotificationType }) {
   }
 }
 
-function NotificationAvatar({
-  notification,
-}: {
-  notification: Notification;
-}) {
+function NotificationAvatar({ notification }: { notification: Notification }) {
   if (!notification.avatar) return null;
 
   const isLive = notification.type === "live";
@@ -154,7 +152,8 @@ function NotificationAvatar({
 }
 
 function NotificationItem({ notification }: { notification: Notification }) {
-  const hasAvatar = notification.type === "live" || notification.type === "booking_confirmed";
+  const hasAvatar =
+    notification.type === "live" || notification.type === "booking_confirmed";
 
   const content = (
     <div
@@ -176,7 +175,9 @@ function NotificationItem({ notification }: { notification: Notification }) {
               {notification.message}
             </p>
             {notification.type !== "live" && (
-              <p className="mt-1.5 text-xs text-[#6b7280]">{notification.time}</p>
+              <p className="mt-1.5 text-xs text-[#6b7280]">
+                {notification.time}
+              </p>
             )}
           </div>
 
@@ -229,11 +230,14 @@ export default function NotificationsPage() {
         >
           ← Back
         </Link>
-        <h1 className="mt-3 text-2xl font-semibold text-white">Notifications</h1>
+        <h1 className="mt-3 text-2xl font-semibold text-white">
+          Notifications
+        </h1>
       </div>
 
       <div className="mb-6 flex gap-2">
         <button
+          type="button"
           onClick={() => setActiveTab("all")}
           className={`rounded-full px-4 py-2 text-sm font-medium transition ${
             activeTab === "all"
@@ -244,6 +248,7 @@ export default function NotificationsPage() {
           All
         </button>
         <button
+          type="button"
           onClick={() => setActiveTab("unread")}
           className={`rounded-full px-4 py-2 text-sm font-medium transition ${
             activeTab === "unread"
@@ -272,7 +277,10 @@ export default function NotificationsPage() {
           </div>
         ) : (
           filteredNotifications.map((notification) => (
-            <NotificationItem key={notification.id} notification={notification} />
+            <NotificationItem
+              key={notification.id}
+              notification={notification}
+            />
           ))
         )}
       </div>

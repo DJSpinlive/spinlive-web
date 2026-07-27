@@ -76,7 +76,9 @@ export default function DJsPage() {
       <div>
         <h1 className="text-3xl font-bold text-white">DJs</h1>
         <p className="mt-1 text-[#6b7280]">
-          {isLoading ? "Loading DJs..." : `${djs.length} DJs available for booking`}
+          {isLoading
+            ? "Loading DJs..."
+            : `${djs.length} DJs available for booking`}
         </p>
       </div>
 

@@ -1,25 +1,23 @@
-
-
-import { User } from './user.types';
+import { User } from "./user.types";
 
 export interface RegisterUserRequest {
   email: string; // must be a valid email
   password: string; // must be at least 8 characters
   display_name: string;
-  role?: 'end_user' | 'dj' | 'admin'; // optional, defaults to 'end_user'
+  role?: "end_user" | "dj" | "admin"; // optional, defaults to 'end_user'
 }
 
 export interface RegisterUserResponse {
   access_token: string;
   refresh_token: string;
-  token_type: 'bearer';
+  token_type: "bearer";
   expires_in: number;
   user: {
     display_name: string;
     email: string;
     id: string;
     kyc_verified: boolean;
-    role: 'end_user' | 'dj' | 'admin';
+    role: "end_user" | "dj" | "admin";
   };
 }
 

@@ -1,8 +1,5 @@
 "use client";
 
-import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ArrowLeft,
   Check,
@@ -10,12 +7,15 @@ import {
   ChevronDown,
   ChevronUp,
 } from "lucide-react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { FormButton } from "@/components/ui/form-button";
 import { ToggleSettingRow } from "@/components/ui/toggle";
 import {
-  FILTER_TAB_PRIMARY,
   DISCOVER_GENRE_FILTERS,
+  FILTER_TAB_PRIMARY,
 } from "@/constants/genre-discovery";
 import {
   useGetGenrePreferencesQuery,
@@ -236,10 +236,8 @@ export default function PreferencesPage() {
               <div className="mt-4 border-t border-[#1e2536] pt-4">
                 <ToggleSettingRow
                   tone="muted"
-
                   title="Show virtual streams"
                   subtitle="Include online-only sets and hybrid events in discovery."
-
                   checked={showVirtualStreams}
                   onCheckedChange={setShowVirtualStreams}
                 />

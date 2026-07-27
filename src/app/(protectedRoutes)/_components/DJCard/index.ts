@@ -1,2 +1,2 @@
-export { DJCard } from "./DJCard";
 export type { DJ } from "./DJCard";
+export { DJCard } from "./DJCard";

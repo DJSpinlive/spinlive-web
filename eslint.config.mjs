@@ -42,6 +42,7 @@ const eslintConfig = [
       "server.js",
       "public/firebase-messaging-sw.js",
       "scripts/**/*",
+      "next-env.d.ts",
     ],
   },
   {

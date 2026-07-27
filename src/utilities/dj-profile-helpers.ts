@@ -59,26 +59,20 @@ export function summarizeAvailability(dj: User): string | null {
   if (!first || typeof first !== "object") return null;
   const o = first as unknown as Record<string, unknown>;
   if (typeof o.label === "string" && o.label.trim()) return o.label.trim();
-  if (typeof o.summary === "string" && o.summary.trim())
+  if (typeof o.summary === "string" && o.summary.trim()) {
     return o.summary.trim();
+  }
   if (typeof o.notes === "string" && o.notes.trim()) return o.notes.trim();
   return null;
 }
 
 export function reviewBody(r: DjReview): string {
-  const raw =
-    r.comment?.trim() ||
-    r.content?.trim() ||
-    r.text?.trim() ||
-    "";
+  const raw = r.comment?.trim() || r.content?.trim() || r.text?.trim() || "";
   return raw;
 }
 
 export function reviewAuthorLabel(r: DjReview): string {
-  const n =
-    r.reviewer_display_name?.trim() ||
-    r.reviewer_name?.trim() ||
-    "";
+  const n = r.reviewer_display_name?.trim() || r.reviewer_name?.trim() || "";
   if (n) return n;
   const id = r.reviewer_id ?? "";
   return id ? `User ${id.slice(0, 8)}…` : "Reviewer";

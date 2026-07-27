@@ -6,11 +6,11 @@ WebSocket chat / song-requests / tips / moderation · single-DJ streams · react
 
 ## Legend
 
-| Tag | Meaning |
-|-----|---------|
-| `ANY` | fan or DJ can send |
-| `DJ ONLY` | `requireDJ` gate |
-| `SERVER→` | pushed to client |
+| Tag       | Meaning            |
+| --------- | ------------------ |
+| `ANY`     | fan or DJ can send |
+| `DJ ONLY` | `requireDJ` gate   |
+| `SERVER→` | pushed to client   |
 
 ---
 
@@ -42,7 +42,7 @@ WebSocket chat / song-requests / tips / moderation · single-DJ streams · react
 ```json
 {
   "type": "chat.send",
-  "payload": { },
+  "payload": {},
   "request_id": "opt-corr-id"
 }
 ```
@@ -71,7 +71,11 @@ Rate-limited. Muted users rejected. Fans out as `chat.message`.
 ```json
 {
   "type": "request.submit",
-  "payload": { "title": "One More Time", "artist": "Daft Punk", "note": "for my bday" },
+  "payload": {
+    "title": "One More Time",
+    "artist": "Daft Punk",
+    "note": "for my bday"
+  },
   "request_id": "2"
 }
 ```
@@ -81,11 +85,19 @@ Rate-limited. Muted users rejected. Fans out as `chat.message`.
 Dequeues by id · notifies the requesting fan.
 
 ```json
-{ "type": "request.accept", "payload": { "id": "<req-uuid>" }, "request_id": "3" }
+{
+  "type": "request.accept",
+  "payload": { "id": "<req-uuid>" },
+  "request_id": "3"
+}
 ```
 
 ```json
-{ "type": "request.decline", "payload": { "id": "<req-uuid>", "reason": "not tonight" }, "request_id": "4" }
+{
+  "type": "request.decline",
+  "payload": { "id": "<req-uuid>", "reason": "not tonight" },
+  "request_id": "4"
+}
 ```
 
 ### `moderation.mute` / `unmute` / `ban` · `DJ ONLY`
@@ -93,7 +105,10 @@ Dequeues by id · notifies the requesting fan.
 `user_id` required · `ban` drops their socket + blocks re-join.
 
 ```json
-{ "type": "moderation.mute", "payload": { "user_id": "<fan>", "reason": "spam" } }
+{
+  "type": "moderation.mute",
+  "payload": { "user_id": "<fan>", "reason": "spam" }
+}
 ```
 
 ```json
@@ -101,7 +116,10 @@ Dequeues by id · notifies the requesting fan.
 ```
 
 ```json
-{ "type": "moderation.ban", "payload": { "user_id": "<fan>", "reason": "abuse" } }
+{
+  "type": "moderation.ban",
+  "payload": { "user_id": "<fan>", "reason": "abuse" }
+}
 ```
 
 ### `moderation.pin` · `DJ ONLY`
@@ -184,7 +202,10 @@ Status → routed back to the requesting fan:
 ```
 
 ```json
-{ "type": "request.declined", "payload": { "id": "req-4d5e…", "reason": "not tonight" } }
+{
+  "type": "request.declined",
+  "payload": { "id": "req-4d5e…", "reason": "not tonight" }
+}
 ```
 
 ### `room_closed` · `SERVER→` (stream ended)
@@ -200,7 +221,11 @@ Control-plane · LB drains · socket closes shortly after.
 Codes: `rate_limited` · `forbidden` · `unknown_type` · `not_implemented` · `internal`.
 
 ```json
-{ "type": "error", "payload": { "code": "forbidden", "message": "DJ role required" }, "request_id": "7" }
+{
+  "type": "error",
+  "payload": { "code": "forbidden", "message": "DJ role required" },
+  "request_id": "7"
+}
 ```
 
 ---
@@ -242,13 +267,13 @@ websocat "wss://api.spinlivepro.com/api/v1/chat/ws?ticket=$TICKET" \
 
 ## Frontend integration · which service each role calls
 
-| Role | Endpoint | Auth | Returns |
-|------|----------|------|---------|
-| DJ | `POST /streams` | DJ-JWT | rtmp · key · hls · chat endpoints |
-| DJ | push A/V (RTMP) | — | LiveKit room (live) |
-| FAN | `POST /{id}/token` | none | LiveKit token · url · chat endpoints |
-| FAN | connect (WebRTC) or HLS | — | subscribe A/V |
-| BOTH | `POST /chat/ws/ticket` → `ws?ticket` | JWT | role from `stream.dj_user_id` |
+| Role | Endpoint                             | Auth   | Returns                              |
+| ---- | ------------------------------------ | ------ | ------------------------------------ |
+| DJ   | `POST /streams`                      | DJ-JWT | rtmp · key · hls · chat endpoints    |
+| DJ   | push A/V (RTMP)                      | —      | LiveKit room (live)                  |
+| FAN  | `POST /{id}/token`                   | none   | LiveKit token · url · chat endpoints |
+| FAN  | connect (WebRTC) or HLS              | —      | subscribe A/V                        |
+| BOTH | `POST /chat/ws/ticket` → `ws?ticket` | JWT    | role from `stream.dj_user_id`        |
 
 DJ publishes via RTMP encoder (OBS / browser WHIP) — fans never publish. Chat role is server-derived.
 
@@ -262,17 +287,24 @@ async function openChat({ jwt, roomId, ticketUrl, wsUrl, onFrame }) {
   // 1. exchange long-lived JWT for a single-use ~30s ticket
   const res = await fetch(ticketUrl ?? `${API}/api/v1/chat/ws/ticket`, {
     method: "POST",
-    headers: { "Authorization": `Bearer ${jwt}`, "Content-Type": "application/json" },
+    headers: {
+      Authorization: `Bearer ${jwt}`,
+      "Content-Type": "application/json",
+    },
     body: JSON.stringify({ room_id: roomId }),
   });
-  const { ticket, ws_url, role } = await res.json();   // role: "DJ" | "FAN"
+  const { ticket, ws_url, role } = await res.json(); // role: "DJ" | "FAN"
 
   // 2. dial the socket with the ticket (JWT never in the URL).
   //    ws_url from the ticket response wins over create-time wsUrl.
   const ws = new WebSocket(`${ws_url ?? wsUrl}?ticket=${ticket}`);
-  ws.onmessage = (e) => onFrame(JSON.parse(e.data));   // {type,payload,request_id}
-  return { ws, role, send: (type, payload, rid) =>
-    ws.send(JSON.stringify({ type, payload, request_id: rid })) };
+  ws.onmessage = (e) => onFrame(JSON.parse(e.data)); // {type,payload,request_id}
+  return {
+    ws,
+    role,
+    send: (type, payload, rid) =>
+      ws.send(JSON.stringify({ type, payload, request_id: rid })),
+  };
 }
 ```
 
@@ -282,9 +314,12 @@ async function openChat({ jwt, roomId, ticketUrl, wsUrl, onFrame }) {
 // (A) create the stream → get RTMP creds + chat endpoints
 const cred = await fetch(`${API}/api/v1/streams/`, {
   method: "POST",
-  headers: { "Authorization": `Bearer ${djJwt}`, "Content-Type": "application/json" },
+  headers: {
+    Authorization: `Bearer ${djJwt}`,
+    "Content-Type": "application/json",
+  },
   body: JSON.stringify({ title: "Friday Night Set" }),
-}).then(r => r.json());
+}).then((r) => r.json());
 // cred = { stream_id, room_name, rtmp_url, stream_key, livekit_url, hls_url,
 //          chat_ticket_url, chat_ws_url }
 
@@ -292,45 +327,60 @@ const cred = await fetch(`${API}/api/v1/streams/`, {
 //     OBS: Settings → Stream → Custom → Server=rtmp_url  Key=stream_key
 //     browser broadcaster: publish via WHIP to livekit_url instead.
 showToEncoder(cred.rtmp_url, cred.stream_key);
-previewVideo.src = cred.hls_url;   // DJ watches own HLS output
+previewVideo.src = cred.hls_url; // DJ watches own HLS output
 
 // (C) open chat as DJ (moderation routes unlock — server-gated)
 const chat = await openChat({
-  jwt: djJwt, roomId: cred.stream_id,
-  ticketUrl: cred.chat_ticket_url, wsUrl: cred.chat_ws_url,
+  jwt: djJwt,
+  roomId: cred.stream_id,
+  ticketUrl: cred.chat_ticket_url,
+  wsUrl: cred.chat_ws_url,
   onFrame: (f) => {
     switch (f.type) {
-      case "chat.message":     renderMsg(f.payload); break;
-      case "request.new":      addToQueue(f.payload); break;  // DJ-only feed
-      case "tip.notification": flashTip(f.payload); break;
-      case "error":            toast(f.payload.message); break;
+      case "chat.message":
+        renderMsg(f.payload);
+        break;
+      case "request.new":
+        addToQueue(f.payload);
+        break; // DJ-only feed
+      case "tip.notification":
+        flashTip(f.payload);
+        break;
+      case "error":
+        toast(f.payload.message);
+        break;
     }
   },
 });
 
 // (D) DJ actions — rejected with error{code:"forbidden"} if role !== DJ
 acceptBtn.onclick = (id) => chat.send("request.accept", { id }, "a1");
-muteBtn.onclick   = (u)  => chat.send("moderation.mute", { user_id: u, reason: "spam" });
-shoutBtn.onclick  = (t)  => chat.send("moderation.shoutout", { body: t });
+muteBtn.onclick = (u) =>
+  chat.send("moderation.mute", { user_id: u, reason: "spam" });
+shoutBtn.onclick = (t) => chat.send("moderation.shoutout", { body: t });
 
 // (E) end the set
-endBtn.onclick = () => fetch(`${API}/api/v1/streams/${cred.stream_id}`,
-  { method: "DELETE", headers: { "Authorization": `Bearer ${djJwt}` } });
-  // → stream.ended on Kafka → chat pushes room_closed → sockets drain
+endBtn.onclick = () =>
+  fetch(`${API}/api/v1/streams/${cred.stream_id}`, {
+    method: "DELETE",
+    headers: { Authorization: `Bearer ${djJwt}` },
+  });
+// → stream.ended on Kafka → chat pushes room_closed → sockets drain
 ```
 
 ### `fan.js` — watch + chat · `FAN`
 
 ```js
 // (A) discover live streams (public, no auth)
-const { live } = await fetch(`${API}/api/v1/streams/`).then(r => r.json());
-const streamId = live[0].stream_id;   // e.g. "stream-<dj-uuid>"
+const { live } = await fetch(`${API}/api/v1/streams/`).then((r) => r.json());
+const streamId = live[0].stream_id; // e.g. "stream-<dj-uuid>"
 
 // (B) get a LiveKit join token (public endpoint, no auth required)
 const tok = await fetch(`${API}/api/v1/streams/${streamId}/token`, {
-  method: "POST", headers: { "Content-Type": "application/json" },
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
   body: JSON.stringify({ user_id: fanId, display_name: "fan42" }),
-}).then(r => r.json());
+}).then((r) => r.json());
 // tok = { token, livekit_url, chat_ticket_url, chat_ws_url }
 
 // (C) subscribe to the room — low-latency WebRTC (livekit-client SDK)
@@ -342,23 +392,39 @@ await room.connect(tok.livekit_url, tok.token);
 
 // (D) open chat as FAN — same helper, fan JWT, role resolves to FAN
 const chat = await openChat({
-  jwt: fanJwt, roomId: streamId,
-  ticketUrl: tok.chat_ticket_url, wsUrl: tok.chat_ws_url,
+  jwt: fanJwt,
+  roomId: streamId,
+  ticketUrl: tok.chat_ticket_url,
+  wsUrl: tok.chat_ws_url,
   onFrame: (f) => {
     switch (f.type) {
-      case "chat.message":     renderMsg(f.payload); break;
-      case "request.accepted": toast("🎶 your request is up!"); break;
-      case "request.declined": toast("not this time"); break;
-      case "tip.notification": flashTip(f.payload); break;
-      case "room_closed":      endScreen(); break;   // stream ended
+      case "chat.message":
+        renderMsg(f.payload);
+        break;
+      case "request.accepted":
+        toast("🎶 your request is up!");
+        break;
+      case "request.declined":
+        toast("not this time");
+        break;
+      case "tip.notification":
+        flashTip(f.payload);
+        break;
+      case "room_closed":
+        endScreen();
+        break; // stream ended
     }
   },
 });
 
 // (E) fan actions — chat + song requests (moderation routes → forbidden)
-sendBtn.onclick    = (t) => chat.send("chat.send", { body: t }, "m1");
-requestBtn.onclick = ()  => chat.send("request.submit",
-  { title: "One More Time", artist: "Daft Punk", note: "for my bday" }, "r1");
+sendBtn.onclick = (t) => chat.send("chat.send", { body: t }, "m1");
+requestBtn.onclick = () =>
+  chat.send(
+    "request.submit",
+    { title: "One More Time", artist: "Daft Punk", note: "for my bday" },
+    "r1"
+  );
 ```
 
 ---
@@ -373,4 +439,4 @@ requestBtn.onclick = ()  => chat.send("request.submit",
 
 ---
 
-*spinlivepro · chat-svc + stream-svc · ticket-exchange WS auth · role = f(stream.dj_user_id)*
+_spinlivepro · chat-svc + stream-svc · ticket-exchange WS auth · role = f(stream.dj_user_id)_

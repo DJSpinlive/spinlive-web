@@ -1,26 +1,15 @@
 "use client";
 
+import { ArrowLeft, ChevronRight, ExternalLink, Trash2 } from "lucide-react";
 import Link from "next/link";
 import type { ReactNode } from "react";
-import {
-  useCallback,
-  useEffect,
-  useRef,
-  useState,
-} from "react";
-import {
-  ArrowLeft,
-  ChevronRight,
-  ExternalLink,
-  Trash2,
-} from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { ToggleSettingRow } from "@/components/ui/toggle";
-
 import {
   loadPrivacyPrefs,
-  savePrivacyPrefs,
   type PrivacyPrefs,
+  savePrivacyPrefs,
 } from "@/utilities/privacy-preferences-storage";
 
 const APP_VERSION_DISPLAY = `v${process.env.NEXT_PUBLIC_APP_VERSION ?? "0.1.0"} (Web)`;
@@ -99,11 +88,12 @@ export default function PrivacySupportPage() {
     savePrivacyPrefs(toggles);
   }, [toggles]);
 
-  useEffect(() => {
-    return () => {
+  useEffect(
+    () => () => {
       if (toastTimer.current) clearTimeout(toastTimer.current);
-    };
-  }, []);
+    },
+    []
+  );
 
   const setToggle = (key: keyof PrivacyPrefs, value: boolean) => {
     setToggles((prev) => ({ ...prev, [key]: value }));
@@ -160,9 +150,7 @@ export default function PrivacySupportPage() {
             <ListRow
               title="Blocked accounts"
               onPress={() =>
-                showToast(
-                  "Blocked user management isn't available on web yet."
-                )
+                showToast("Blocked user management isn't available on web yet.")
               }
               withDivider
             />
@@ -192,9 +180,7 @@ export default function PrivacySupportPage() {
             />
             <ListRow
               title="Report a problem"
-              onPress={() =>
-                showToast("Reporting isn't wired up on web yet.")
-              }
+              onPress={() => showToast("Reporting isn't wired up on web yet.")}
             />
           </SectionCard>
         </section>
@@ -207,9 +193,7 @@ export default function PrivacySupportPage() {
             <ExternalRow
               title="Terms of Service"
               onPress={() =>
-                showToast(
-                  "Terms page will be linked here once it's published."
-                )
+                showToast("Terms page will be linked here once it's published.")
               }
               withDivider
             />
