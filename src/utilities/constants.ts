@@ -6,7 +6,8 @@ export const AUTH_COOKIE_NAMES = {
 
 // Environment — add keys here only when something in the app imports them
 export const ENV_VARS = {
-  API_URL: process.env.NEXT_PUBLIC_API_URL || "https://api.spinlivepro.com/api/v1",
+  API_URL:
+    process.env.NEXT_PUBLIC_API_URL || "https://api.spinlivepro.com/api/v1",
 } as const;
 
 export const BASE_PATHS = {
