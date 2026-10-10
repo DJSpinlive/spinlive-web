@@ -85,6 +85,7 @@ export default function SignupPage() {
         email: values.email,
         password: values.password,
         display_name: displayName,
+        role:"end_user"
       }).unwrap();
 
       setAuthTokensToCookies(response);
