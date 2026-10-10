@@ -8,6 +8,7 @@ import * as yup from "yup";
 
 import { FormButton } from "@/components/ui/form-button";
 import { FormInput } from "@/components/ui/form-input";
+import { Logo } from "@/components/ui/logo";
 import { useLoginUserMutation } from "@/store/api";
 import { useAppDispatch } from "@/store/hooks";
 import { refreshTokenSuccess } from "@/store/slices/authSlice";
@@ -76,9 +77,7 @@ export default function LoginPage() {
         <div className="grid w-full overflow-hidden rounded-[28px] border border-[#12213c] bg-[#050f1f] shadow-[0_30px_70px_rgba(0,0,0,0.5)] md:grid-cols-2">
           <section className="hidden h-full flex-col justify-between border-r border-[#12213c] bg-[radial-gradient(circle_at_top,#3f2f85_0%,#111d35_40%,#050f1f_75%)] p-10 md:flex">
             <div>
-              <span className="inline-flex rounded-full border border-[#6f57f3]/40 bg-[#6f57f3]/20 px-3 py-1 text-xs uppercase tracking-[0.12em] text-[#d5cbff]">
-                SpinLive
-              </span>
+              <Logo />
               <h1 className="mt-4 text-3xl font-semibold leading-tight text-white">
                 Welcome back to your interactive DJ world.
               </h1>
@@ -103,16 +102,9 @@ export default function LoginPage() {
           </section>
 
           <section className="w-full p-4 sm:p-8 md:p-10">
-            <button
-              type="button"
-              onClick={() => router.back()}
-              className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-[#1e2a46] bg-[#050d1b] text-xl text-[#c5cee0]"
-              aria-label="Go back"
-            >
-              ←
-            </button>
+            <Logo className="md:hidden" />
 
-            <h2 className="mt-6 text-3xl font-semibold leading-tight text-white">
+            <h2 className="mt-6 text-3xl font-semibold leading-tight text-white md:mt-0">
               Welcome Back
             </h2>
             <p className="mt-2 max-w-sm text-base leading-6 text-[#9da8bf]">
@@ -184,15 +176,20 @@ export default function LoginPage() {
             </div>
 
             <div className="space-y-3">
+              {/* Social sign-in is disabled until the auth service exposes an OAuth exchange endpoint. */}
               <button
                 type="button"
-                className="h-12 w-full rounded-xl border border-[#142544] bg-[#051122] text-base text-[#dce4f5] transition hover:border-[#2e4d88]"
+                disabled
+                title="Coming soon"
+                className="h-12 w-full cursor-not-allowed rounded-xl border border-[#142544] bg-[#051122] text-base text-[#dce4f5] opacity-50"
               >
                 Continue with Google
               </button>
               <button
                 type="button"
-                className="h-12 w-full rounded-xl border border-[#142544] bg-[#051122] text-base text-[#dce4f5] transition hover:border-[#2e4d88]"
+                disabled
+                title="Coming soon"
+                className="h-12 w-full cursor-not-allowed rounded-xl border border-[#142544] bg-[#051122] text-base text-[#dce4f5] opacity-50"
               >
                 Continue with Apple
               </button>

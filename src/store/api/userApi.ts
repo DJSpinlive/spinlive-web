@@ -100,6 +100,14 @@ export const userApi = baseSlice.injectEndpoints({
       invalidatesTags: ["User"],
     }),
 
+    /** Catalogue of all selectable genres (used by onboarding and preferences). */
+    getGenres: builder.query<Genre[], void>({
+      query: () => `${BASE_PATHS.USER_SERVICE}/genres`,
+      transformResponse: (response: unknown) =>
+        normalizeGenrePreferencesResponse(response),
+      providesTags: ["Genres"],
+    }),
+
     getGenrePreferences: builder.query<Genre[], void>({
       query: () => `${BASE_PATHS.USER_SERVICE}/me/genre-preferences`,
       transformResponse: (response: unknown) =>
@@ -127,6 +135,7 @@ export const {
   useGetUserQuery,
   useUpdateUserMutation,
   useUploadUserAvatarMutation,
+  useGetGenresQuery,
   useGetGenrePreferencesQuery,
   useUpdateGenrePreferencesMutation,
 } = userApi;

@@ -71,11 +71,41 @@ export function reviewBody(r: DjReview): string {
   return raw;
 }
 
+/**
+ * Best available name for a reviewer. The reviews endpoint currently returns only
+ * `reviewer_id`, so we fall back to a short handle derived from it.
+ */
 export function reviewAuthorLabel(r: DjReview): string {
-  const n = r.reviewer_display_name?.trim() || r.reviewer_name?.trim() || "";
-  if (n) return n;
+  const named =
+    r.reviewer_username?.trim() ||
+    r.reviewer_display_name?.trim() ||
+    r.reviewer_name?.trim() ||
+    "";
+  if (named) return named.startsWith("@") ? named : `@${named}`;
   const id = r.reviewer_id ?? "";
-  return id ? `User ${id.slice(0, 8)}…` : "Reviewer";
+  return id ? `@user-${id.slice(0, 8)}` : "Reviewer";
+}
+
+/** Full reviewer id, shown under the name so reviews are traceable. */
+export function reviewAuthorId(r: DjReview): string {
+  return r.reviewer_id?.trim() ?? "";
+}
+
+/** Stable React key for a review row. */
+export function reviewKeyFor(r: DjReview, index: number): string {
+  const { id } = r;
+  if (typeof id === "number" && Number.isFinite(id)) return `review-${id}`;
+  if (typeof id === "string" && id.length > 0) return id;
+  return `review-idx-${index}`;
+}
+
+/** The signed-in user's review of this DJ, if they have already left one. */
+export function findOwnReview(
+  reviews: DjReview[],
+  currentUserId: string | undefined
+): DjReview | undefined {
+  if (!currentUserId) return undefined;
+  return reviews.find((r) => r.reviewer_id === currentUserId);
 }
 
 export function formatReviewDate(iso?: string | null): string {

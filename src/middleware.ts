@@ -51,6 +51,7 @@ export function middleware(request: NextRequest) {
     "/bookings",
     "/notifications",
     "/djs",
+    "/onboarding",
   ] as const;
 
   /** Covers `/login`, `/login/email-otp`, etc. */

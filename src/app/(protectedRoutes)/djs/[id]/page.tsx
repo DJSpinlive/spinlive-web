@@ -17,16 +17,20 @@ import {
   useReviewDjMutation,
   useUnFollowDjMutation,
 } from "@/store/api/djApi";
+import { useGetUserQuery } from "@/store/api/userApi";
 import {
   bookingCountFromUser,
   djAvatarFallback,
+  findOwnReview,
   followerCountFromUser,
   formatCompact,
   formatReviewDate,
   formatUsdHourly,
   isFollowingFromUser,
+  reviewAuthorId,
   reviewAuthorLabel,
   reviewBody,
+  reviewKeyFor,
   reviewStarCount,
   summarizeAvailability,
   toHttpsAvatarUrl,
@@ -54,6 +58,8 @@ export default function DjProfilePage() {
     refetch: refetchReviews,
   } = useGetDjReviewsQuery({ djId }, { skip: !validId });
 
+  const { data: currentUser } = useGetUserQuery();
+
   const [followDj, { isLoading: followBusy }] = useFollowDjMutation();
   const [unfollowDj, { isLoading: unfollowBusy }] = useUnFollowDjMutation();
   const [reviewDj, { isLoading: reviewSubmitting }] = useReviewDjMutation();
@@ -63,6 +69,13 @@ export default function DjProfilePage() {
   const [reviewRating, setReviewRating] = useState(5);
   const [banner, setBanner] = useState<string | null>(null);
 
+  /** A user may leave only one review per DJ; an existing one is edited in place. */
+  const ownReview = useMemo(
+    () => findOwnReview(reviews, currentUser?.id),
+    [reviews, currentUser?.id]
+  );
+  const isEditingReview = Boolean(ownReview);
+
   const closeReviewModal = useCallback(() => {
     setReviewModalOpen(false);
     setReviewDraft("");
@@ -70,10 +83,10 @@ export default function DjProfilePage() {
   }, []);
 
   const openReviewModal = useCallback(() => {
-    setReviewDraft("");
-    setReviewRating(5);
+    setReviewDraft(ownReview ? reviewBody(ownReview) : "");
+    setReviewRating(ownReview ? reviewStarCount(ownReview) : 5);
     setReviewModalOpen(true);
-  }, []);
+  }, [ownReview]);
 
   const refreshAll = useCallback(async () => {
     await Promise.all([refetchDj(), refetchReviews()]);
@@ -168,11 +181,23 @@ export default function DjProfilePage() {
         comment: text,
       }).unwrap();
       closeReviewModal();
-      setBanner("Your review was posted.");
+      setBanner(
+        isEditingReview ? "Your review was updated." : "Your review was posted."
+      );
     } catch (e) {
-      window.alert(`Could not post review: ${getErrorMessage(e)}`);
+      window.alert(
+        `Could not ${isEditingReview ? "update" : "post"} review: ${getErrorMessage(e)}`
+      );
     }
-  }, [djId, validId, reviewDj, reviewDraft, reviewRating, closeReviewModal]);
+  }, [
+    djId,
+    validId,
+    reviewDj,
+    reviewDraft,
+    reviewRating,
+    closeReviewModal,
+    isEditingReview,
+  ]);
 
   const headerActions = (
     <div className="mb-6 flex items-center gap-4 border-b border-[#1e2536] pb-4">
@@ -488,7 +513,7 @@ export default function DjProfilePage() {
                 className="text-sm font-semibold"
                 style={{ color: ACCENT }}
               >
-                Write review
+                {isEditingReview ? "Edit your review" : "Write review"}
               </button>
             </div>
           </div>
@@ -500,10 +525,13 @@ export default function DjProfilePage() {
               {reviews.map((r, idx) => {
                 const body = reviewBody(r);
                 const author = reviewAuthorLabel(r);
+                const authorId = reviewAuthorId(r);
                 const dateStr = formatReviewDate(r.created_at ?? null);
                 const stars = reviewStarCount(r);
-                const reviewKey =
-                  r.id && r.id.length > 0 ? r.id : `review-${idx}`;
+                const reviewKey = reviewKeyFor(r, idx);
+                const isOwnReview = Boolean(
+                  currentUser?.id && r.reviewer_id === currentUser.id
+                );
                 const reviewerAvatarFallback = `https://picsum.photos/seed/rev-${encodeURIComponent(String(r.id ?? idx))}/80/80`;
                 const revAvatarRaw = r.reviewer_avatar_url
                   ? toHttpsAvatarUrl(r.reviewer_avatar_url)
@@ -526,8 +554,15 @@ export default function DjProfilePage() {
                       />
                       <div className="min-w-0 flex-1">
                         <div className="flex flex-wrap items-baseline justify-between gap-2">
-                          <span className="font-semibold text-white">
-                            {author}
+                          <span className="flex flex-wrap items-baseline gap-2">
+                            <span className="font-semibold text-white">
+                              {author}
+                            </span>
+                            {isOwnReview ? (
+                              <span className="rounded-full bg-[#8b5cf6]/20 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[#c7bbff]">
+                                You
+                              </span>
+                            ) : null}
                           </span>
                           {dateStr ? (
                             <span className="text-xs text-[#8b95b0]">
@@ -535,6 +570,14 @@ export default function DjProfilePage() {
                             </span>
                           ) : null}
                         </div>
+                        {authorId ? (
+                          <p
+                            className="truncate text-xs text-[#5f6983]"
+                            title={authorId}
+                          >
+                            ID {authorId}
+                          </p>
+                        ) : null}
                         <div className="mt-1 flex gap-0.5" aria-hidden>
                           {Array.from({ length: stars }, (_, starIdx) => (
                             <RatingStarSolidIcon
@@ -576,8 +619,15 @@ export default function DjProfilePage() {
               id="review-modal-title"
               className="mb-3 text-lg font-bold text-white"
             >
-              Write a review
+              {isEditingReview ? "Edit your review" : "Write a review"}
             </h2>
+
+            {isEditingReview ? (
+              <p className="mb-3 text-sm text-[#8b95b0]">
+                You have already reviewed this DJ. Saving replaces your existing
+                review.
+              </p>
+            ) : null}
 
             <p className="mb-2 text-[11px] font-bold uppercase tracking-wider text-[#8b95b0]">
               Rating
@@ -634,7 +684,13 @@ export default function DjProfilePage() {
                 onClick={submitReview}
                 className="rounded-xl bg-[#8b5cf6] px-5 py-2 text-[15px] font-bold text-white transition hover:bg-[#7c3aed] disabled:opacity-50"
               >
-                {reviewSubmitting ? "Posting…" : "Post"}
+                {reviewSubmitting
+                  ? isEditingReview
+                    ? "Saving…"
+                    : "Posting…"
+                  : isEditingReview
+                    ? "Save changes"
+                    : "Post"}
               </button>
             </div>
           </div>

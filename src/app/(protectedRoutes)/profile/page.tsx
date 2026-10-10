@@ -206,8 +206,8 @@ export default function ProfilePage() {
             <span className="ml-2 inline-block h-2 w-2 animate-pulse rounded-full bg-[#8b5cf6]" />
           ) : null}
         </h1>
-        <button
-          type="button"
+        <Link
+          href="/profile/preferences"
           className="flex h-10 w-10 items-center justify-center rounded-xl border border-[#1e2536] bg-[#0d1117] transition hover:border-[#2d3548]"
           aria-label="Settings"
         >
@@ -230,7 +230,7 @@ export default function ProfilePage() {
               d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
             />
           </svg>
-        </button>
+        </Link>
       </div>
 
       <div className="grid gap-6 lg:grid-cols-[380px_1fr]">

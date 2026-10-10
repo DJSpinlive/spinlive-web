@@ -1,5 +1,6 @@
 export interface DjReview {
-  id?: string;
+  /** `/users/djs/{id}/reviews` returns a numeric id; older payloads used strings. */
+  id?: string | number;
   dj_id?: string;
   reviewer_id?: string;
   rating?: number;
@@ -7,6 +8,8 @@ export interface DjReview {
   /** API may expose alternate text fields */
   content?: string;
   text?: string;
+  /** Present only when the API enriches reviews with reviewer details. */
+  reviewer_username?: string;
   reviewer_display_name?: string;
   reviewer_name?: string;
   reviewer_avatar_url?: string | null;

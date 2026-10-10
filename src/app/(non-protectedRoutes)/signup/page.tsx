@@ -1,6 +1,7 @@
 "use client";
 
 import { yupResolver } from "@hookform/resolvers/yup";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { SubmitHandler, useForm } from "react-hook-form";
@@ -8,19 +9,32 @@ import * as yup from "yup";
 
 import { FormButton } from "@/components/ui/form-button";
 import { FormInput } from "@/components/ui/form-input";
+import { Logo } from "@/components/ui/logo";
+import { cn } from "@/lib/utils";
 import { useRegisterUserMutation } from "@/store/api";
 import { useAppDispatch } from "@/store/hooks";
 import { refreshTokenSuccess } from "@/store/slices/authSlice";
 import { setAuthTokensToCookies } from "@/utilities/clientCookies";
 import { getErrorMessage } from "@/utilities/helpers";
 
+const NAME_PATTERN = /^[\p{L}][\p{L}'\- ]*$/u;
+
 const signupSchema = yup
   .object({
-    displayName: yup
+    firstName: yup
       .string()
       .trim()
-      .min(2, "Display name must be at least 2 characters")
-      .required("Display name is required"),
+      .min(2, "First name must be at least 2 characters")
+      .max(60, "First name must be at most 60 characters")
+      .matches(NAME_PATTERN, "Use letters, spaces, hyphens, or apostrophes")
+      .required("First name is required"),
+    lastName: yup
+      .string()
+      .trim()
+      .min(2, "Last name must be at least 2 characters")
+      .max(60, "Last name must be at most 60 characters")
+      .matches(NAME_PATTERN, "Use letters, spaces, hyphens, or apostrophes")
+      .required("Last name is required"),
     email: yup
       .string()
       .trim()
@@ -28,8 +42,12 @@ const signupSchema = yup
       .required("Email address is required"),
     password: yup
       .string()
-      .min(6, "Password must be at least 6 characters")
+      .min(8, "Password must be at least 8 characters")
       .required("Password is required"),
+    acceptedTerms: yup
+      .boolean()
+      .oneOf([true], "Accept the Terms and Privacy Policy to continue")
+      .required(),
   })
   .required();
 
@@ -48,9 +66,11 @@ export default function SignupPage() {
   } = useForm<SignupFormValues>({
     resolver: yupResolver(signupSchema),
     defaultValues: {
-      displayName: "",
+      firstName: "",
+      lastName: "",
       email: "",
       password: "",
+      acceptedTerms: false,
     },
     mode: "onBlur",
   });
@@ -58,10 +78,13 @@ export default function SignupPage() {
   const onSubmit: SubmitHandler<SignupFormValues> = async (values) => {
     setSubmitError(null);
     try {
+      /** The auth service stores one `display_name`, so send the joined pair. */
+      const displayName = `${values.firstName.trim()} ${values.lastName.trim()}`;
+
       const response = await registerUser({
         email: values.email,
         password: values.password,
-        display_name: values.displayName,
+        display_name: displayName,
       }).unwrap();
 
       setAuthTokensToCookies(response);
@@ -71,7 +94,7 @@ export default function SignupPage() {
           refreshToken: response.refresh_token,
         })
       );
-      router.push("/home");
+      router.push("/onboarding");
     } catch (error: unknown) {
       setSubmitError(
         getErrorMessage(error, {
@@ -87,9 +110,7 @@ export default function SignupPage() {
         <div className="grid w-full overflow-hidden rounded-[28px] border border-[#12213c] bg-[#050f1f] shadow-[0_30px_70px_rgba(0,0,0,0.5)] md:grid-cols-2">
           <section className="hidden h-full flex-col justify-between border-r border-[#12213c] bg-[radial-gradient(circle_at_top,#3f2f85_0%,#111d35_40%,#050f1f_75%)] p-10 md:flex">
             <div>
-              <span className="inline-flex rounded-full border border-[#6f57f3]/40 bg-[#6f57f3]/20 px-3 py-1 text-xs uppercase tracking-[0.12em] text-[#d5cbff]">
-                SpinLive
-              </span>
+              <Logo />
               <h1 className="mt-4 text-3xl font-semibold leading-tight text-white">
                 Create your account and get started.
               </h1>
@@ -114,16 +135,9 @@ export default function SignupPage() {
           </section>
 
           <section className="w-full p-4 sm:p-8 md:p-10">
-            <button
-              type="button"
-              onClick={() => router.back()}
-              className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-[#1e2a46] bg-[#050d1b] text-xl text-[#c5cee0]"
-              aria-label="Go back"
-            >
-              ←
-            </button>
+            <Logo className="md:hidden" />
 
-            <h2 className="mt-6 text-3xl font-semibold leading-tight text-white">
+            <h2 className="mt-6 text-3xl font-semibold leading-tight text-white md:mt-0">
               Create Account
             </h2>
             <p className="mt-2 max-w-sm text-base leading-6 text-[#9da8bf]">
@@ -140,21 +154,36 @@ export default function SignupPage() {
                 </p>
               )}
 
-              <FormInput
-                id="displayName"
-                label="Display Name"
-                aria-label="Display name"
-                type="text"
-                placeholder="Alex Johnson"
-                error={errors.displayName?.message}
-                {...register("displayName")}
-              />
+              <div className="grid gap-5 sm:grid-cols-2">
+                <FormInput
+                  id="firstName"
+                  label="First Name"
+                  aria-label="First name"
+                  type="text"
+                  autoComplete="given-name"
+                  placeholder="Alex"
+                  error={errors.firstName?.message}
+                  {...register("firstName")}
+                />
+
+                <FormInput
+                  id="lastName"
+                  label="Last Name"
+                  aria-label="Last name"
+                  type="text"
+                  autoComplete="family-name"
+                  placeholder="Johnson"
+                  error={errors.lastName?.message}
+                  {...register("lastName")}
+                />
+              </div>
 
               <FormInput
                 id="email"
                 label="Email Address"
                 aria-label="Email address"
                 type="email"
+                autoComplete="email"
                 placeholder="alex@example.com"
                 error={errors.email?.message}
                 {...register("email")}
@@ -165,6 +194,7 @@ export default function SignupPage() {
                 label="Password"
                 aria-label="Password"
                 type={isPasswordVisible ? "text" : "password"}
+                autoComplete="new-password"
                 placeholder="••••••••"
                 error={errors.password?.message}
                 rightAdornment={
@@ -181,6 +211,45 @@ export default function SignupPage() {
                 }
                 {...register("password")}
               />
+
+              <div>
+                <label
+                  htmlFor="acceptedTerms"
+                  className="flex items-start gap-3 text-sm leading-6 text-[#9da8bf]"
+                >
+                  <input
+                    id="acceptedTerms"
+                    type="checkbox"
+                    className={cn(
+                      "mt-1 h-4 w-4 shrink-0 accent-[#7d5ef5]",
+                      errors.acceptedTerms ? "outline outline-[#f87171]" : ""
+                    )}
+                    {...register("acceptedTerms")}
+                  />
+                  <span>
+                    I agree to the{" "}
+                    <Link
+                      href="/terms"
+                      className="font-medium text-[#7d66ff] underline-offset-2 hover:underline"
+                    >
+                      Terms &amp; Conditions
+                    </Link>{" "}
+                    and{" "}
+                    <Link
+                      href="/terms#privacy"
+                      className="font-medium text-[#7d66ff] underline-offset-2 hover:underline"
+                    >
+                      Privacy Policy
+                    </Link>
+                    .
+                  </span>
+                </label>
+                {errors.acceptedTerms ? (
+                  <p className="mt-1 text-sm text-[#fca5a5]">
+                    {errors.acceptedTerms.message}
+                  </p>
+                ) : null}
+              </div>
 
               <FormButton
                 type="submit"

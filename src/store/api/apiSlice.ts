@@ -223,6 +223,7 @@ export const baseSlice = createApi({
     "DjsList",
     "DjsDetails",
     "DjReviews",
+    "Genres",
     "GenrePreferences",
     "Bookings",
   ],

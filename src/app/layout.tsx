@@ -23,10 +23,13 @@ const roboto = Roboto({
 });
 
 export const metadata: Metadata = {
-  title: "Next Starter",
-  description: "Next starter",
+  title: {
+    default: "SpinLive",
+    template: "%s · SpinLive",
+  },
+  description: "Discover live DJ sets, book DJs, and join the room — SpinLive.",
   icons: {
-    icon: "/images/logo2.png", // refers to file in /public directory
+    icon: "/spinlive-mark.svg",
   },
 };
 

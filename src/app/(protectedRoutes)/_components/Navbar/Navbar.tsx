@@ -4,7 +4,10 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 import { BellIcon, SearchIconOutline } from "@/components/assets";
+import { Logo } from "@/components/ui/logo";
 import { cn } from "@/lib/utils";
+
+import { ProfileMenu } from "./ProfileMenu";
 
 const navLinks = [
   { href: "/home", label: "Discover" },
@@ -19,13 +22,8 @@ export function Navbar() {
   return (
     <header className="mb-6 flex items-center justify-between gap-4 py-3">
       <div className="flex items-center gap-10">
-        <Link href="/home" className="flex items-center gap-2.5">
-          <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-[#8b5cf6] to-[#6366f1] text-sm font-bold text-white">
-            S
-          </span>
-          <span className="text-lg font-semibold tracking-tight text-white">
-            SpinLive{" "}
-          </span>
+        <Link href="/home" aria-label="SpinLive home">
+          <Logo />
         </Link>
 
         <nav className="hidden items-center gap-1 md:flex">
@@ -74,13 +72,7 @@ export function Navbar() {
           </span>
         </Link>
 
-        <Link
-          href="/profile"
-          className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-full bg-gradient-to-br from-[#6366f1] to-[#8b5cf6]"
-          aria-label="Profile"
-        >
-          <span className="text-sm font-semibold text-white">AJ</span>
-        </Link>
+        <ProfileMenu />
       </div>
     </header>
   );

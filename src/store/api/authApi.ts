@@ -38,6 +38,12 @@ export const authApi = baseSlice.injectEndpoints({
         body,
       }),
     }),
+    logoutUser: builder.mutation<void, void>({
+      query: () => ({
+        url: `${BASE_PATHS.AUTH_SERVICE}/logout`,
+        method: "POST",
+      }),
+    }),
     refreshToken: builder.mutation<
       RefreshTokenResponse,
       { refresh_token: string }
@@ -55,4 +61,5 @@ export const {
   useRegisterUserMutation,
   useLoginUserMutation,
   useVerifyAccountMutation,
+  useLogoutUserMutation,
 } = authApi;
