@@ -1,4 +1,5 @@
 import {
+  AcceptTermsRequest,
   Genre,
   UpdateGenrePreferencesRequest,
   UpdateUserRequest,
@@ -126,7 +127,28 @@ export const userApi = baseSlice.injectEndpoints({
       }),
       transformResponse: (response: unknown) =>
         normalizeGenrePreferencesResponse(response),
-      invalidatesTags: ["GenrePreferences"],
+      invalidatesTags: ["GenrePreferences", "RecommendedDjs"],
+    }),
+
+    /** Records which T&C version the user accepted (U-09). */
+    acceptTerms: builder.mutation<User, AcceptTermsRequest>({
+      query: (body) => ({
+        url: `${BASE_PATHS.USER_SERVICE}/me/terms`,
+        method: "POST",
+        body,
+      }),
+      transformResponse: (response: unknown) => normalizeMePayload(response),
+      invalidatesTags: ["User"],
+    }),
+
+    /** Sets `onboarding_completed` on the profile (U-12). */
+    completeOnboarding: builder.mutation<User, void>({
+      query: () => ({
+        url: `${BASE_PATHS.USER_SERVICE}/me/onboarding/complete`,
+        method: "POST",
+      }),
+      transformResponse: (response: unknown) => normalizeMePayload(response),
+      invalidatesTags: ["User"],
     }),
   }),
 });
@@ -138,4 +160,6 @@ export const {
   useGetGenresQuery,
   useGetGenrePreferencesQuery,
   useUpdateGenrePreferencesMutation,
+  useAcceptTermsMutation,
+  useCompleteOnboardingMutation,
 } = userApi;

@@ -8,7 +8,13 @@ export const AUTH_COOKIE_NAMES = {
 export const ENV_VARS = {
   API_URL:
     process.env.NEXT_PUBLIC_API_URL || "https://api.spinlivepro.com/api/v1",
+  /** Payments are disabled in the UI when this is empty. */
+  STRIPE_PUBLISHABLE_KEY:
+    process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY?.trim() ?? "",
 } as const;
+
+/** T&C version sent at sign-up; bump with the terms page's "last updated" date. */
+export const TERMS_VERSION = "2026-09-19";
 
 export const BASE_PATHS = {
   USER_SERVICE: "/users",
@@ -17,4 +23,5 @@ export const BASE_PATHS = {
   NOTIFICATION_SERVICE: "/notification",
   BOOKINGS_SERVICE: "/bookings",
   CHAT_SERVICE: "/chat",
+  PAYMENTS_SERVICE: "/payments",
 };

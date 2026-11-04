@@ -5,14 +5,19 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 
+import { TipModal } from "@/components/payments/tip-modal";
 import { useStreamChat } from "@/hooks";
 import {
   useCreateStreamTokenMutation,
   useDjDetailQuery,
+  useFollowDjMutation,
+  useGetDjRelationshipQuery,
   useGetStreamQuery,
   useGetUserQuery,
+  useUnFollowDjMutation,
 } from "@/store/api";
 import { StreamTokenResponse } from "@/types/chat.types";
+import { getErrorMessage } from "@/utilities/helpers";
 
 import { ChatPanel } from "./_components/ChatPanel";
 import { StreamPlayer } from "./_components/StreamPlayer";
@@ -26,6 +31,13 @@ export default function LiveDetailsPage() {
     skip: !stream?.dj_user_id,
   });
   const { data: me } = useGetUserQuery();
+  const djUserId = stream?.dj_user_id || "";
+  const { data: relationship } = useGetDjRelationshipQuery(djUserId, {
+    skip: !djUserId,
+  });
+  const [followDj, { isLoading: followBusy }] = useFollowDjMutation();
+  const [unfollowDj, { isLoading: unfollowBusy }] = useUnFollowDjMutation();
+  const [tipOpen, setTipOpen] = useState(false);
 
   const [createStreamToken] = useCreateStreamTokenMutation();
   const [streamToken, setStreamToken] = useState<StreamTokenResponse | null>(
@@ -48,6 +60,22 @@ export default function LiveDetailsPage() {
   );
 
   const streamEnded = !!stream?.ended_at;
+  const isFollowing = relationship?.is_following ?? false;
+
+  const handleFollow = useCallback(async () => {
+    if (!djUserId) return;
+    try {
+      if (isFollowing) {
+        await unfollowDj(djUserId).unwrap();
+      } else {
+        await followDj(djUserId).unwrap();
+      }
+    } catch (e) {
+      showToast(
+        getErrorMessage(e, { fallbackMessage: "Could not update follow." })
+      );
+    }
+  }, [djUserId, isFollowing, followDj, unfollowDj, showToast]);
 
   // Fan LiveKit join token — public endpoint, also returns chat endpoints.
   useEffect(() => {
@@ -200,9 +228,11 @@ export default function LiveDetailsPage() {
               </Link>
               <button
                 type="button"
-                className="rounded-xl border border-[#1e2536] bg-[#0d1117] px-5 py-2.5 text-sm font-medium text-white transition hover:border-[#2d3548]"
+                disabled={!djUserId || followBusy || unfollowBusy}
+                onClick={handleFollow}
+                className="rounded-xl border border-[#1e2536] bg-[#0d1117] px-5 py-2.5 text-sm font-medium text-white transition hover:border-[#2d3548] disabled:opacity-50"
               >
-                Follow
+                {isFollowing ? "Following" : "Follow"}
               </button>
             </div>
           </div>
@@ -215,9 +245,25 @@ export default function LiveDetailsPage() {
           onClearError={clearChatError}
           onSendMessage={sendMessage}
           onSubmitRequest={submitRequest}
-          onTip={() => showToast("Tipping is coming soon 🎁")}
+          onTip={() =>
+            isEnded
+              ? showToast("Tips are only available while the stream is live.")
+              : setTipOpen(true)
+          }
         />
       </div>
+
+      {tipOpen ? (
+        <TipModal
+          streamId={streamId}
+          djName={djName}
+          onClose={() => setTipOpen(false)}
+          onSent={(message) => {
+            setTipOpen(false);
+            showToast(message);
+          }}
+        />
+      ) : null}
 
       {toast ? (
         <div className="fixed bottom-6 left-1/2 z-50 -translate-x-1/2 rounded-xl border border-[#1e2536] bg-[#0d1117] px-4 py-3 text-sm text-white shadow-xl">

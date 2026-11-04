@@ -1,6 +1,6 @@
 "use client";
 
-import { SlidersHorizontal } from "lucide-react";
+import { Heart, SlidersHorizontal } from "lucide-react";
 import Link from "next/link";
 
 import {
@@ -26,6 +26,13 @@ const settingsItems = [
     description:
       "Favorite genres, discovery defaults for DJs and streams, and booking budget.",
     href: "/profile/preferences",
+  },
+  {
+    id: "my-djs",
+    icon: "heart",
+    title: "My DJs",
+    description: "DJs you follow and the ones you've added to favourites.",
+    href: "/profile/djs",
   },
   {
     id: "verification",
@@ -117,6 +124,8 @@ function SettingsIcon({ icon }: { icon: SettingsItemIcon }) {
   switch (icon) {
     case "sliders":
       return <SlidersHorizontal className={iconClass} />;
+    case "heart":
+      return <Heart className={iconClass} />;
     case "shield-check":
       return <ShieldCheckIcon className={iconClass} />;
     case "credit-card":

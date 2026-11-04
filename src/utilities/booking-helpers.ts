@@ -22,6 +22,7 @@ export type BookingListTab = "upcoming" | "pending" | "past";
 const PENDING: Booking["status"][] = [
   "pending_dj_review",
   "awaiting_end_user_confirmation",
+  "awaiting_payment",
 ];
 
 const PAST_STATUSES: Booking["status"][] = [
@@ -144,12 +145,14 @@ export function bookingUiStatus(b: Booking): BookingUiStatus {
   return "cancelled";
 }
 
-export function bookingStatusHeadline(b: Booking): string {
-  switch (b.status) {
+export function bookingStatusLabel(status: Booking["status"]): string {
+  switch (status) {
     case "pending_dj_review":
       return "Awaiting DJ";
     case "awaiting_end_user_confirmation":
       return "Awaiting your confirmation";
+    case "awaiting_payment":
+      return "Payment due";
     case "confirmed":
       return "Confirmed";
     case "completed":
@@ -165,8 +168,12 @@ export function bookingStatusHeadline(b: Booking): string {
     case "cancelled_by_admin":
       return "Cancelled";
     default:
-      return b.status;
+      return status;
   }
+}
+
+export function bookingStatusHeadline(b: Booking): string {
+  return bookingStatusLabel(b.status);
 }
 
 export function inferLocationType(
@@ -354,6 +361,7 @@ export function toBookingEventDateIso(d: Date): string {
 const CANCELLABLE: Booking["status"][] = [
   "pending_dj_review",
   "awaiting_end_user_confirmation",
+  "awaiting_payment",
   "confirmed",
 ];
 

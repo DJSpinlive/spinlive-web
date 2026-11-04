@@ -72,16 +72,14 @@ export function reviewBody(r: DjReview): string {
 }
 
 /**
- * Best available name for a reviewer. The reviews endpoint currently returns only
- * `reviewer_id`, so we fall back to a short handle derived from it.
+ * Best available name for a reviewer. The API returns `reviewer_display_name`
+ * (no usernames exist yet), falling back to a short handle from `reviewer_id`.
  */
 export function reviewAuthorLabel(r: DjReview): string {
-  const named =
-    r.reviewer_username?.trim() ||
-    r.reviewer_display_name?.trim() ||
-    r.reviewer_name?.trim() ||
-    "";
-  if (named) return named.startsWith("@") ? named : `@${named}`;
+  const username = r.reviewer_username?.trim();
+  if (username) return username.startsWith("@") ? username : `@${username}`;
+  const named = r.reviewer_display_name?.trim() || r.reviewer_name?.trim();
+  if (named) return named;
   const id = r.reviewer_id ?? "";
   return id ? `@user-${id.slice(0, 8)}` : "Reviewer";
 }

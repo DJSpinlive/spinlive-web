@@ -4,7 +4,11 @@ import Image from "next/image";
 import Link from "next/link";
 import { useState } from "react";
 
-import { useDiscoverDjsQuery, useGetStreamsQuery } from "@/store/api";
+import {
+  useDiscoverDjsQuery,
+  useGetRecommendedDjsQuery,
+  useGetStreamsQuery,
+} from "@/store/api";
 import type { Stream } from "@/types/streams.types";
 import type { User } from "@/types/user.types";
 
@@ -74,6 +78,9 @@ export default function HomePage() {
     limit: 12,
     offset: 0,
   });
+  const { data: recommendedData = [] } = useGetRecommendedDjsQuery({
+    limit: 4,
+  });
 
   const allLiveStreams = (streamsData?.live || []).map(mapStreamToCard);
   const allDjs = (djsData?.djs || []).map(mapDjToCard);
@@ -96,6 +103,11 @@ export default function HomePage() {
         )
     )
     .slice(0, 4);
+
+  /** Only DJs sharing at least one genre with the viewer count as recommended. */
+  const recommendedDjs = recommendedData
+    .filter((dj) => dj.shared_genres.length > 0)
+    .map(mapDjToCard);
 
   const featuredStream = liveStreams[0];
 
@@ -304,6 +316,28 @@ export default function HomePage() {
           </div>
         )}
       </section>
+
+      {recommendedDjs.length > 0 ? (
+        <section>
+          <div className="mb-5 flex items-center justify-between">
+            <h2 className="text-2xl font-bold text-white">
+              Recommended for You
+            </h2>
+            <Link
+              href="/profile/preferences"
+              className="text-sm font-medium text-[#8b5cf6] transition hover:text-[#a78bfa]"
+            >
+              Edit Genres
+            </Link>
+          </div>
+
+          <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
+            {recommendedDjs.map((dj) => (
+              <DJCard key={dj.id} dj={dj} />
+            ))}
+          </div>
+        </section>
+      ) : null}
 
       <section>
         <div className="mb-5 flex items-center justify-between">

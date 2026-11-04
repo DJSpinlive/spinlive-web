@@ -4,8 +4,9 @@ import {
   RefreshTokenResponse,
   RegisterUserRequest,
   RegisterUserResponse,
-  VerifyAccountRequest,
-  VerifyAccountResponse,
+  ResendVerificationRequest,
+  VerifyEmailRequest,
+  VerifyEmailResponse,
 } from "@/types/auth.types";
 import { BASE_PATHS } from "@/utilities";
 
@@ -28,12 +29,16 @@ export const authApi = baseSlice.injectEndpoints({
         body: user,
       }),
     }),
-    verifyAccount: builder.mutation<
-      VerifyAccountResponse,
-      VerifyAccountRequest
-    >({
-      query: (body: VerifyAccountRequest) => ({
-        url: `${BASE_PATHS.AUTH_SERVICE}/verify`,
+    verifyEmail: builder.mutation<VerifyEmailResponse, VerifyEmailRequest>({
+      query: (body: VerifyEmailRequest) => ({
+        url: `${BASE_PATHS.AUTH_SERVICE}/verify-email`,
+        method: "POST",
+        body,
+      }),
+    }),
+    resendVerification: builder.mutation<void, ResendVerificationRequest>({
+      query: (body: ResendVerificationRequest) => ({
+        url: `${BASE_PATHS.AUTH_SERVICE}/resend-verification`,
         method: "POST",
         body,
       }),
@@ -60,6 +65,7 @@ export const authApi = baseSlice.injectEndpoints({
 export const {
   useRegisterUserMutation,
   useLoginUserMutation,
-  useVerifyAccountMutation,
+  useVerifyEmailMutation,
+  useResendVerificationMutation,
   useLogoutUserMutation,
 } = authApi;

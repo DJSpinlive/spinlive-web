@@ -10,6 +10,7 @@ import { FormInput } from "@/components/ui/form-input";
 import { Logo } from "@/components/ui/logo";
 import { cn } from "@/lib/utils";
 import {
+  useCompleteOnboardingMutation,
   useGetGenrePreferencesQuery,
   useGetGenresQuery,
   useGetUserQuery,
@@ -18,7 +19,6 @@ import {
   useUploadUserAvatarMutation,
 } from "@/store/api";
 import { getErrorMessage } from "@/utilities/helpers";
-import { markOnboardingComplete } from "@/utilities/onboarding-storage";
 
 const AVATAR_FALLBACK =
   "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?q=80&w=200&auto=format&fit=crop";
@@ -76,6 +76,8 @@ export default function OnboardingPage() {
   const [updateUser, { isLoading: savingProfile }] = useUpdateUserMutation();
   const [uploadAvatar, { isLoading: uploadingAvatar }] =
     useUploadUserAvatarMutation();
+  const [completeOnboarding, { isLoading: completing }] =
+    useCompleteOnboardingMutation();
 
   const [step, setStep] = useState<StepIndex>(0);
   const [selectedSlugs, setSelectedSlugs] = useState<string[]>([]);
@@ -110,15 +112,18 @@ export default function OnboardingPage() {
     );
   }, []);
 
-  const finish = useCallback(() => {
-    markOnboardingComplete(user?.id);
-    router.replace("/home");
-  }, [router, user?.id]);
-
-  const skip = useCallback(() => {
-    markOnboardingComplete(user?.id);
-    router.replace("/home");
-  }, [router, user?.id]);
+  /** Finishing and skipping both set `onboarding_completed` so login stops redirecting here. */
+  const finish = useCallback(async () => {
+    setError(null);
+    try {
+      await completeOnboarding().unwrap();
+      router.replace("/home");
+    } catch (e) {
+      setError(
+        getErrorMessage(e, { fallbackMessage: "Could not finish onboarding." })
+      );
+    }
+  }, [completeOnboarding, router]);
 
   const saveGenres = useCallback(async () => {
     if (selectedSlugs.length < MIN_GENRES) {
@@ -178,8 +183,11 @@ export default function OnboardingPage() {
     [uploadAvatar]
   );
 
-  const busy = savingGenres || savingProfile || uploadingAvatar;
-  const firstName = user?.display_name?.trim().split(/\s+/)[0] ?? "there";
+  const busy = savingGenres || savingProfile || uploadingAvatar || completing;
+  const firstName =
+    user?.first_name?.trim() ||
+    user?.display_name?.trim().split(/\s+/)[0] ||
+    "there";
 
   return (
     <main className="mx-auto flex min-h-screen w-full max-w-3xl flex-col px-4 py-8 sm:px-6 md:py-12">
@@ -188,8 +196,9 @@ export default function OnboardingPage() {
         {step < 2 ? (
           <button
             type="button"
-            onClick={skip}
-            className="text-sm font-medium text-[#8b95ad] transition hover:text-white"
+            disabled={busy}
+            onClick={finish}
+            className="text-sm font-medium text-[#8b95ad] transition hover:text-white disabled:opacity-60"
           >
             Skip for now
           </button>
@@ -365,10 +374,11 @@ export default function OnboardingPage() {
 
           <FormButton
             type="button"
+            disabled={busy}
             onClick={finish}
             className="mt-8 bg-gradient-to-r from-[#8a63ff] to-[#6f56f3] text-base hover:from-[#9b7bff] hover:to-[#7b66ff] sm:w-auto sm:px-10"
           >
-            Start exploring
+            {completing ? "Finishing…" : "Start exploring"}
           </FormButton>
         </section>
       ) : null}

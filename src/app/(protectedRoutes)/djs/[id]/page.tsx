@@ -12,9 +12,13 @@ import {
 } from "@/components/assets";
 import {
   useDjDetailQuery,
+  useEditMyReviewMutation,
+  useFavoriteDjMutation,
   useFollowDjMutation,
+  useGetDjRelationshipQuery,
   useGetDjReviewsQuery,
   useReviewDjMutation,
+  useUnFavoriteDjMutation,
   useUnFollowDjMutation,
 } from "@/store/api/djApi";
 import { useGetUserQuery } from "@/store/api/userApi";
@@ -36,6 +40,9 @@ import {
   toHttpsAvatarUrl,
 } from "@/utilities/dj-profile-helpers";
 import { getErrorMessage } from "@/utilities/helpers";
+
+import { DjEventReviews } from "./_components/DjEventReviews";
+import { DjWeekAvailability } from "./_components/DjWeekAvailability";
 
 const ACCENT = "#8b5cf6";
 
@@ -59,10 +66,19 @@ export default function DjProfilePage() {
   } = useGetDjReviewsQuery({ djId }, { skip: !validId });
 
   const { data: currentUser } = useGetUserQuery();
+  const { data: relationship } = useGetDjRelationshipQuery(djId, {
+    skip: !validId,
+  });
 
   const [followDj, { isLoading: followBusy }] = useFollowDjMutation();
   const [unfollowDj, { isLoading: unfollowBusy }] = useUnFollowDjMutation();
-  const [reviewDj, { isLoading: reviewSubmitting }] = useReviewDjMutation();
+  const [favoriteDj, { isLoading: favoriteBusy }] = useFavoriteDjMutation();
+  const [unFavoriteDj, { isLoading: unFavoriteBusy }] =
+    useUnFavoriteDjMutation();
+  const [reviewDj, { isLoading: reviewPosting }] = useReviewDjMutation();
+  const [editMyReview, { isLoading: reviewEditing }] =
+    useEditMyReviewMutation();
+  const reviewSubmitting = reviewPosting || reviewEditing;
 
   const [reviewModalOpen, setReviewModalOpen] = useState(false);
   const [reviewDraft, setReviewDraft] = useState("");
@@ -131,13 +147,37 @@ export default function DjProfilePage() {
     return `${formatUsdHourly(rate)}/hr`;
   }, [dj?.hourly_rate]);
 
-  const isFollowing = isFollowingFromUser(dj);
+  /** Relationship is the source of truth; the profile flag covers the first load. */
+  const isFollowing = relationship?.is_following ?? isFollowingFromUser(dj);
+  const isFavorite = relationship?.is_favorite ?? false;
+  const sharedGenres = useMemo(
+    () =>
+      new Set((relationship?.shared_genres ?? []).map((g) => g.toLowerCase())),
+    [relationship?.shared_genres]
+  );
   const followBusyAny = followBusy || unfollowBusy;
+  const favoriteBusyAny = favoriteBusy || unFavoriteBusy;
+
+  const handleFavorite = useCallback(async () => {
+    if (!validId) return;
+    try {
+      if (isFavorite) {
+        await unFavoriteDj(djId).unwrap();
+      } else {
+        await favoriteDj(djId).unwrap();
+      }
+      setBanner(null);
+    } catch (e) {
+      setBanner(
+        getErrorMessage(e, { fallbackMessage: "Could not update favourites." })
+      );
+    }
+  }, [djId, validId, isFavorite, favoriteDj, unFavoriteDj]);
 
   const handleFollow = useCallback(async () => {
     if (!validId || !dj) return;
     try {
-      if (isFollowingFromUser(dj)) {
+      if (isFollowing) {
         await unfollowDj(djId).unwrap();
       } else {
         await followDj(djId).unwrap();
@@ -148,20 +188,25 @@ export default function DjProfilePage() {
         getErrorMessage(e, { fallbackMessage: "Could not update follow." })
       );
     }
-  }, [dj, djId, validId, followDj, unfollowDj]);
+  }, [dj, djId, validId, isFollowing, followDj, unfollowDj]);
 
   const handleBook = useCallback(() => {
     if (!validId) return;
     router.push(`/djs/${djId}/book`);
   }, [router, djId, validId]);
 
-  const handleTip = useCallback(() => {
-    window.alert("Tipping feature coming soon!");
-  }, []);
-
   const handleWatchLive = useCallback(() => {
     router.push("/live");
   }, [router]);
+
+  /** Tips are tied to a stream, so they are sent from the live page. */
+  const handleTip = useCallback(() => {
+    if (dj?.is_live) {
+      handleWatchLive();
+      return;
+    }
+    setBanner("Tips can be sent while this DJ is streaming live.");
+  }, [dj?.is_live, handleWatchLive]);
 
   const submitReview = useCallback(async () => {
     const text = reviewDraft.trim();
@@ -174,12 +219,19 @@ export default function DjProfilePage() {
       setBanner("Please write at least a few words.");
       return;
     }
+    const body = { djId, rating: reviewRating, comment: text };
     try {
-      await reviewDj({
-        djId,
-        rating: reviewRating,
-        comment: text,
-      }).unwrap();
+      if (isEditingReview) {
+        await editMyReview(body).unwrap();
+      } else {
+        try {
+          await reviewDj(body).unwrap();
+        } catch (e) {
+          /** 409: a review already exists (list was stale), so edit it instead. */
+          if ((e as { status?: unknown })?.status !== 409) throw e;
+          await editMyReview(body).unwrap();
+        }
+      }
       closeReviewModal();
       setBanner(
         isEditingReview ? "Your review was updated." : "Your review was posted."
@@ -193,6 +245,7 @@ export default function DjProfilePage() {
     djId,
     validId,
     reviewDj,
+    editMyReview,
     reviewDraft,
     reviewRating,
     closeReviewModal,
@@ -429,6 +482,23 @@ export default function DjProfilePage() {
           </button>
           <button
             type="button"
+            disabled={favoriteBusyAny}
+            onClick={() => handleFavorite()}
+            className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-[#8b5cf6] text-lg transition ${
+              isFavorite
+                ? "bg-[#8b5cf6] text-white"
+                : "bg-transparent text-[#8b5cf6] hover:bg-[#8b5cf6]/10"
+            } ${favoriteBusyAny ? "opacity-50" : ""}`}
+            aria-label={
+              isFavorite ? "Remove from favourites" : "Add to favourites"
+            }
+            aria-pressed={isFavorite}
+            title={isFavorite ? "Favourited" : "Add to favourites"}
+          >
+            {isFavorite ? "♥" : "♡"}
+          </button>
+          <button
+            type="button"
             onClick={handleTip}
             className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-[#8b5cf6] bg-transparent text-[#8b5cf6] transition hover:bg-[#8b5cf6]/10"
             aria-label="Tip DJ"
@@ -467,10 +537,16 @@ export default function DjProfilePage() {
             <div className="flex flex-wrap gap-2">
               {genres.map((genre, idx) => {
                 const key = `${genre}-${idx}`;
+                const shared = sharedGenres.has(genre.toLowerCase());
                 return (
                   <span
                     key={key}
-                    className="rounded-full border border-[#1e2536] bg-[#0d1117] px-3.5 py-2 text-sm font-semibold text-[#e7ecff]"
+                    className={`rounded-full border px-3.5 py-2 text-sm font-semibold ${
+                      shared
+                        ? "border-[#8b5cf6] bg-[#8b5cf6]/15 text-[#e7ecff]"
+                        : "border-[#1e2536] bg-[#0d1117] text-[#e7ecff]"
+                    }`}
+                    title={shared ? "You like this genre too" : undefined}
                   >
                     {genre}
                   </span>
@@ -483,21 +559,13 @@ export default function DjProfilePage() {
         </section>
 
         <section>
-          <h3 className="mb-3 text-lg font-bold text-white">Availability</h3>
-          <div className="rounded-2xl border border-[#1e2536] bg-[#0d1117] p-4">
-            <div className="flex items-start gap-3">
-              <span className="text-xl" aria-hidden>
-                📅
-              </span>
-              <p className="flex-1 text-[15px] font-medium text-[#e7ecff]">
-                {availabilityLine ??
-                  "Detailed hours are confirmed when you send a booking request."}
-              </p>
-            </div>
-            <p className="mt-2 text-sm text-[#8b95b0]">
-              Use Book below to propose a date and time.
-            </p>
-          </div>
+          <h3 className="mb-3 text-lg font-bold text-white">
+            Availability this week
+          </h3>
+          {availabilityLine ? (
+            <p className="mb-3 text-sm text-[#8b95b0]">{availabilityLine}</p>
+          ) : null}
+          <DjWeekAvailability djId={djId} />
         </section>
 
         <section>
@@ -599,6 +667,10 @@ export default function DjProfilePage() {
             </ul>
           )}
         </section>
+      </div>
+
+      <div className="mx-auto mt-6 max-w-3xl">
+        <DjEventReviews djId={djId} />
       </div>
 
       {reviewModalOpen ? (

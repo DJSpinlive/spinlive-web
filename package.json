@@ -23,6 +23,8 @@
     "@radix-ui/react-slot": "^1.2.3",
     "@reduxjs/toolkit": "^2.5.1",
     "@sentry/nextjs": "^9.22.0",
+    "@stripe/react-stripe-js": "3.7.0",
+    "@stripe/stripe-js": "5.10.0",
     "@tiptap/extension-link": "^3.14.0",
     "@tiptap/extension-placeholder": "^3.14.0",
     "@tiptap/react": "^3.14.0",

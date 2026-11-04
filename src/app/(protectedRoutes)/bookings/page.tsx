@@ -56,7 +56,10 @@ function BookingCard({ booking }: { booking: Booking }) {
   const uiStatus = bookingUiStatus(booking);
 
   return (
-    <div className="rounded-2xl border border-[#1e2536] bg-[#0d1117] p-4">
+    <Link
+      href={`/bookings/${booking.id}`}
+      className="block rounded-2xl border border-[#1e2536] bg-[#0d1117] p-4 transition hover:border-[#2d3548]"
+    >
       <div className="flex gap-4">
         <div className="flex h-16 w-16 flex-shrink-0 flex-col items-center justify-center rounded-xl bg-[#1a2234]">
           <span className="text-[10px] font-semibold tracking-wider text-amber-400">
@@ -105,7 +108,15 @@ function BookingCard({ booking }: { booking: Booking }) {
         </p>
         <span className="text-xs text-[#6b7280]">{booking.eventType}</span>
       </div>
-    </div>
+      {booking.status === "awaiting_payment" ||
+      booking.status === "awaiting_end_user_confirmation" ? (
+        <p className="mt-3 rounded-lg bg-[#8b5cf6]/15 px-3 py-2 text-center text-xs font-semibold text-[#c7bbff]">
+          {booking.status === "awaiting_payment"
+            ? "Payment due · tap to pay"
+            : "Quote received · tap to review"}
+        </p>
+      ) : null}
+    </Link>
   );
 }
 

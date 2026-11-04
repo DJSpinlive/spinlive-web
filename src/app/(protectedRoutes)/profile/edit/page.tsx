@@ -25,10 +25,20 @@ const AVATAR_FALLBACK =
 
 interface EditProfileFormValues {
   displayName: string;
-  username: string;
+  firstName: string;
+  lastName: string;
+  dateOfBirth: string;
   email: string;
   city: string;
   bio: string;
+}
+
+/** Local `YYYY-MM-DD`, comparable with `<input type="date">` values. */
+function todayIsoDate(): string {
+  const now = new Date();
+  const month = String(now.getMonth() + 1).padStart(2, "0");
+  const day = String(now.getDate()).padStart(2, "0");
+  return `${now.getFullYear()}-${month}-${day}`;
 }
 
 const editProfileSchema: yup.ObjectSchema<EditProfileFormValues> = yup.object({
@@ -42,15 +52,23 @@ const editProfileSchema: yup.ObjectSchema<EditProfileFormValues> = yup.object({
       "Full name must be at least 2 characters when provided",
       (v) => v.length === 0 || v.length >= 2
     ),
-  username: yup
+  firstName: yup
     .string()
     .defined()
     .trim()
-    .max(50, "Username must be at most 50 characters")
+    .max(80, "First name must be at most 80 characters"),
+  lastName: yup
+    .string()
+    .defined()
+    .trim()
+    .max(80, "Last name must be at most 80 characters"),
+  dateOfBirth: yup
+    .string()
+    .defined()
     .test(
-      "handle",
-      "Use letters, numbers, underscores, or hyphens.",
-      (v) => v.length === 0 || /^[a-zA-Z0-9_-]+$/.test(v)
+      "past-date",
+      "Date of birth must be in the past",
+      (v) => v.length === 0 || v < todayIsoDate()
     ),
   email: yup
     .string()
@@ -70,28 +88,12 @@ const editProfileSchema: yup.ObjectSchema<EditProfileFormValues> = yup.object({
     .max(2000, "Bio must be at most 2000 characters"),
 });
 
-function readOptionalString(value: unknown): string | undefined {
-  if (value == null) {
-    return undefined;
-  }
-  if (typeof value === "string") {
-    return value;
-  }
-  return undefined;
-}
-
-function usernameSeedForForm(user: User): string {
-  const emailLocal = user.email?.split("@")[0] ?? "";
-  const uname = readOptionalString(Reflect.get(user, "username"));
-  if (!uname?.length) return emailLocal;
-  const trimmed = uname.trim();
-  return trimmed.length > 0 ? trimmed : emailLocal;
-}
-
 function defaultValuesFromUser(user: User): EditProfileFormValues {
   return {
     displayName: user.display_name?.trim() ?? "",
-    username: usernameSeedForForm(user),
+    firstName: user.first_name?.trim() ?? "",
+    lastName: user.last_name?.trim() ?? "",
+    dateOfBirth: user.date_of_birth?.slice(0, 10) ?? "",
     email: user.email ?? "",
     city: user.location?.trim() ?? "",
     bio: user.bio?.trim() ?? "",
@@ -121,7 +123,9 @@ export default function EditProfilePage() {
     resolver: yupResolver(editProfileSchema),
     defaultValues: {
       displayName: "",
-      username: "",
+      firstName: "",
+      lastName: "",
+      dateOfBirth: "",
       email: "",
       city: "",
       bio: "",
@@ -174,13 +178,16 @@ export default function EditProfilePage() {
     setSaveError(null);
     try {
       const displayNameTrimmed = values.displayName.trim();
-      const usernameTrimmed = values.username.trim();
+      const firstNameTrimmed = values.firstName.trim();
+      const lastNameTrimmed = values.lastName.trim();
       const bioTrimmed = values.bio.trim();
       const cityTrimmed = values.city.trim();
       await updateUser({
         display_name:
           displayNameTrimmed.length > 0 ? displayNameTrimmed : undefined,
-        username: usernameTrimmed.length > 0 ? usernameTrimmed : undefined,
+        first_name: firstNameTrimmed.length > 0 ? firstNameTrimmed : null,
+        last_name: lastNameTrimmed.length > 0 ? lastNameTrimmed : null,
+        date_of_birth: values.dateOfBirth || null,
         bio: bioTrimmed,
         location: cityTrimmed.length > 0 ? cityTrimmed : undefined,
       }).unwrap();
@@ -301,15 +308,26 @@ export default function EditProfilePage() {
               error={errors.displayName?.message}
             />
             <FormInput
-              {...register("username")}
-              label="Username"
-              placeholder="Enter username"
-              error={errors.username?.message}
-              rightAdornment={
-                <span className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-xs text-[#8b95b0]">
-                  @
-                </span>
-              }
+              {...register("firstName")}
+              label="First name"
+              placeholder="Enter your first name"
+              autoComplete="given-name"
+              error={errors.firstName?.message}
+            />
+            <FormInput
+              {...register("lastName")}
+              label="Last name"
+              placeholder="Enter your last name"
+              autoComplete="family-name"
+              error={errors.lastName?.message}
+            />
+            <FormInput
+              {...register("dateOfBirth")}
+              type="date"
+              label="Date of birth"
+              max={todayIsoDate()}
+              autoComplete="bday"
+              error={errors.dateOfBirth?.message}
             />
             <FormInput
               {...register("email")}

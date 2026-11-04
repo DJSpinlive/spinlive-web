@@ -1,0 +1,198 @@
+BOOKING PAYMENT FLOW (one-time payment for a DJ booking)
+=========================================================
+
+Audience: frontend engineers (sections 1-6), backend/devops (sections 7-9).
+Services involved: booking, payment, Stripe, Kafka. All requests go through the
+Kong gateway; both /api/v1/bookings and /api/v1/payments are already routed.
+
+
+1. OVERVIEW
+-----------
+
+A fan pays the DJ's agreed price for a booking in one Stripe payment. The
+booking is only CONFIRMED after the payment succeeds ("pay to confirm"). Until
+then it sits in the new status "awaiting_payment" and holds the DJ's calendar
+slot.
+
+The amount is never sent by the client. The payment service reads it from the
+booking (finalAmount), so a fan cannot choose or tamper with the price.
+
+Booking status flow:
+
+  pending_dj_review
+        |  DJ sends quote            POST /bookings/{id}/quote
+        v
+  awaiting_end_user_confirmation
+        |  fan accepts               POST /bookings/{id}/accept
+        |  (or DJ confirms           PUT  /bookings/{id}/confirm)
+        v
+  awaiting_payment                   <-- NEW. Fan must pay now.
+        |  Stripe payment succeeds   (automatic, server side)
+        v
+  confirmed
+        |  DJ marks done             POST /bookings/{id}/complete
+        v
+  completed
+
+  Other exits: declined_by_end_user, declined_by_dj, cancelled_by_user,
+  cancelled_by_dj, cancelled_by_admin.
+
+What changed vs. before:
+  - accept used to go straight to "confirmed". It now goes to "awaiting_payment".
+  - A DJ calling PUT /bookings/{id}/confirm now also goes to "awaiting_payment".
+  - Only an ADMIN confirm still goes straight to "confirmed" (bypasses payment).
+
+
+2. ENDPOINTS THE FRONTEND USES
+------------------------------
+
+All calls need:  Authorization: Bearer <access JWT>
+JSON field names are camelCase.
+
++---------------------+-----------------------------------------+------------+--------------------------------------------------+
+| Step                | Endpoint                                | Who        | Notes                                            |
++---------------------+-----------------------------------------+------------+--------------------------------------------------+
+| Create request      | POST /api/v1/bookings                   | fan        | Unchanged.                                       |
+| DJ sends quote      | POST /api/v1/bookings/{id}/quote        | DJ         | Unchanged.                                       |
+| Read booking        | GET  /api/v1/bookings/{id}              | fan/DJ     | status can now be "awaiting_payment".            |
+| Fan accepts quote   | POST /api/v1/bookings/{id}/accept       | fan        | CHANGED: returns status "awaiting_payment" and   |
+|                     |                                         |            | finalAmount set. No longer confirms.             |
+| DJ confirms         | PUT  /api/v1/bookings/{id}/confirm      | DJ         | CHANGED: now -> "awaiting_payment".              |
+|                     |                                         |            | 409 if the booking has no amount (no quote and   |
+|                     |                                         |            | no budget).                                      |
+| START PAYMENT       | POST /api/v1/payments/bookings/{id}/pay | fan        | NEW. Returns Stripe clientSecret. See section 3. |
+| Payment status      | GET  /api/v1/payments/bookings/{id}     | fan/DJ/    | NEW. Returns the transaction. 404 if payment has |
+|                     |                                         | admin      | not been started.                                |
+| Cancel booking      | DELETE /api/v1/bookings/{id}            | any party  | Unchanged. NOTE: does not refund (section 8).    |
++---------------------+-----------------------------------------+------------+--------------------------------------------------+
+
+Not for frontend use: GET /api/v1/bookings/internal/{id}/payment-context
+(service-to-service only, requires X-Internal-Service-Key).
+
+
+3. POST /api/v1/payments/bookings/{bookingId}/pay
+-------------------------------------------------
+
+Fan only. Call it when the booking is in "awaiting_payment".
+
+Request body: OPTIONAL. No Idempotency-Key header is needed (the booking id is
+the idempotency key). Send a body only for a saved card:
+
+  { "paymentMethodId": "pm_...", "savePaymentMethod": false }
+
+  paymentMethodId    Saved card (one-tap). Must belong to this fan. Cards only.
+  savePaymentMethod  On the normal path, ask Stripe to save the card for later.
+
+Response 201:
+
+  {
+    "transactionId": "uuid",
+    "bookingId": "uuid",
+    "paymentIntentId": "pi_...",
+    "clientSecret": "pi_..._secret_...",
+    "amountMinor": 25000,            // minor units: 25000 = 250.00
+    "currency": "USD",
+    "status": "requires_payment_method",
+    "requiresAction": false          // true => finish 3DS with stripe.confirmPayment
+  }
+
+Errors:
+  400  unsupported currency / invalid card type
+  401  missing or invalid token
+  403  caller is not a fan, or the booking belongs to someone else, or the saved
+       card does not belong to this fan
+  404  booking not found
+  409  "Booking is not awaiting payment"
+       "Booking is already paid"
+       "Booking has no payable amount"
+       "Booking amount changed after payment was started; contact support"
+       "Previous payment attempt was canceled; contact support"
+  502  booking service unavailable
+
+It is safe to call repeatedly (double-click, page refresh, retry after a
+declined card): it returns the SAME PaymentIntent and clientSecret each time.
+
+
+4. WHAT THE FRONTEND MUST DO (step by step)
+-------------------------------------------
+
+ 1. Show the booking. When status == "awaiting_payment", show a "Pay now"
+    button with finalAmount and currency (finalAmount is in major units,
+    e.g. 250.00).
+
+ 2. On click, call POST /api/v1/payments/bookings/{id}/pay.
+
+ 3. Confirm the payment with Stripe.js using the returned clientSecret:
+      - Normal path: stripe.confirmPayment({ elements, clientSecret, ... })
+        with the Payment Element, or confirmCardPayment(clientSecret, ...).
+      - If you sent paymentMethodId (one-tap) and requiresAction == true, call
+        stripe.confirmPayment / handleNextAction with the clientSecret to
+        complete 3D Secure.
+    Use your Stripe PUBLISHABLE key in the browser. Never the secret key.
+
+ 4. Do NOT treat the Stripe.js success result as "booking confirmed". Show
+    "Payment received, confirming your booking..." and poll
+    GET /api/v1/bookings/{id} every 1-2 seconds until status == "confirmed".
+    Typical delay is a few seconds (Stripe webhook -> payment outbox ->
+    Kafka -> booking). Stop polling and show a "taking longer than usual,
+    check back soon" message after ~60 seconds.
+
+ 5. If Stripe.js reports a decline/failure, show the error and let the user
+    retry. The booking stays "awaiting_payment". Calling /pay again reuses the
+    same PaymentIntent, so the user can try another card.
+
+ 6. Optional: GET /api/v1/payments/bookings/{id} returns the transaction
+    (status: requires_payment_method | processing | succeeded | failed |
+    canceled) if you want to show payment state, e.g. on the DJ's booking page.
+
+ 7. Update any UI that assumed accept/confirm => "confirmed". Handle the new
+    "awaiting_payment" status everywhere booking status is displayed or
+    filtered (fan: "Payment due"; DJ: "Waiting for fan to pay").
+
+ 8. Booking statuses that should NOT show a Pay button: anything other than
+    "awaiting_payment".
+
+Also note: TransactionResponse (GET /api/v1/payments/transactions and the
+earnings endpoints) has a new field "bookingId" (null for tips), and
+transactions can now have type "booking" as well as "tip".
+
+
+5. MONEY DETAILS
+----------------
+
+  - Booking amounts are in major units (BigDecimal, e.g. 250.00).
+    Payment amounts are in minor units (long, e.g. 25000).
+  - Currencies allowed: USD, GBP, EUR (payment service setting).
+  - Platform fee: PLATFORM_FEE_BPS (default 1000 = 10%) is taken from the
+    amount. On 250.00 the fan pays 250.00; 25.00 is the platform fee; 225.00
+    is credited to the DJ's wallet. The fan is charged the booking amount only
+    (no extra fee on top).
+  - The DJ's net is credited to their wallet (GET /api/v1/payments/wallet).
+  
+
+
+6. END-TO-END SEQUENCE
+----------------------
+
+  Fan app        Booking svc      Payment svc          Stripe        Kafka
+     |  accept ->     |                |                  |             |
+     |<- awaiting_payment              |                  |             |
+     |  POST /payments/bookings/{id}/pay ->                |             |
+     |                |<- payment-context (internal) --    |             |
+     |                |-- amount, fan, DJ, status -->      |             |
+     |                |                |-- create PaymentIntent -->     |
+     |<-------- clientSecret ----------|                  |             |
+     |-------- confirm payment with Stripe.js ----------->|             |
+     |                |                |<- webhook payment_intent.succeeded
+     |                |                | mark succeeded, credit DJ wallet,
+     |                |                | write outbox row (one DB transaction)
+     |                |                |-- booking.payment.succeeded -->|
+     |                |<------------------------------------------------|
+     |                | awaiting_payment -> confirmed (+ "confirmed" event)
+     |  GET /bookings/{id} (polling) -> status "confirmed"
+
+  Only the signed Stripe webhook marks a payment as paid. The API call and the
+  browser result never do.
+
+
+

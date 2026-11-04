@@ -17,3 +17,31 @@ export interface DjReview {
 }
 
 export type GetDjReviewsResponse = DjReview[];
+
+export interface ReviewDjRequest {
+  djId: string;
+  rating: number;
+  comment: string;
+}
+
+export interface DjRelationship {
+  dj_id: string;
+  is_following: boolean;
+  is_favorite: boolean;
+  shared_genres: string[];
+}
+
+export interface FollowDjResponse {
+  status: "followed" | "already_following" | "unfollowed" | "not_following";
+  dj_id?: string | null;
+}
+
+export interface FavoriteDjResponse {
+  status: "favorited" | "already_favorited" | "unfavorited" | "not_favorited";
+  dj_id: string;
+}
+
+export interface ReviewDjResponse {
+  status: "created" | "updated";
+  review_id: number;
+}

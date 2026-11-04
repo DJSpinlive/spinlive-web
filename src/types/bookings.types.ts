@@ -4,6 +4,7 @@ export interface GetBookingsParams {
   status?:
     | "pending_dj_review"
     | "awaiting_end_user_confirmation"
+    | "awaiting_payment"
     | "confirmed"
     | "declined_by_end_user"
     | "declined_by_dj"
@@ -14,6 +15,9 @@ export interface GetBookingsParams {
 
   upcoming?: boolean;
   past?: boolean;
+  today?: boolean;
+  /** IANA zone used by the date filters; API defaults to UTC. */
+  timezone?: string;
 }
 
 export interface Booking {
@@ -26,6 +30,7 @@ export interface Booking {
   status:
     | "pending_dj_review"
     | "awaiting_end_user_confirmation"
+    | "awaiting_payment"
     | "confirmed"
     | "declined_by_end_user"
     | "declined_by_dj"
@@ -78,6 +83,35 @@ export interface CreateBookingRequest {
 }
 
 export type GetBookingsResponse = Booking[];
+
+export interface BookingHistoryEntry {
+  id: number;
+  fromStatus: Booking["status"] | null;
+  toStatus: Booking["status"];
+  changedByUserId: string | null;
+  changedByRole: string | null;
+  note: string | null;
+  createdAt: string;
+}
+
+/** Per-booking review (booking svc); separate from the DJ-level rating in the user svc. */
+export interface BookingReview {
+  id: string;
+  bookingId: string;
+  djId: string;
+  reviewerId: string;
+  reviewerDisplayName: string | null;
+  rating: number;
+  comment: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface BookingReviewRequest {
+  bookingId: string;
+  rating: number; // 1-5
+  comment?: string;
+}
 
 export interface TimeSlot {
   hour: number;

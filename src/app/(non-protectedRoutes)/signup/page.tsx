@@ -3,18 +3,21 @@
 import { yupResolver } from "@hookform/resolvers/yup";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { SubmitHandler, useForm } from "react-hook-form";
 import * as yup from "yup";
 
+import { VerifyEmailStep } from "@/components/auth/verify-email-step";
 import { FormButton } from "@/components/ui/form-button";
 import { FormInput } from "@/components/ui/form-input";
 import { Logo } from "@/components/ui/logo";
 import { cn } from "@/lib/utils";
-import { useRegisterUserMutation } from "@/store/api";
+import { useLoginUserMutation, useRegisterUserMutation } from "@/store/api";
 import { useAppDispatch } from "@/store/hooks";
 import { refreshTokenSuccess } from "@/store/slices/authSlice";
+import { LoginUserResponse, VerifyEmailResponse } from "@/types/auth.types";
 import { setAuthTokensToCookies } from "@/utilities/clientCookies";
+import { TERMS_VERSION } from "@/utilities/constants";
 import { getErrorMessage } from "@/utilities/helpers";
 
 const NAME_PATTERN = /^[\p{L}][\p{L}'\- ]*$/u;
@@ -25,14 +28,14 @@ const signupSchema = yup
       .string()
       .trim()
       .min(2, "First name must be at least 2 characters")
-      .max(60, "First name must be at most 60 characters")
+      .max(80, "First name must be at most 80 characters")
       .matches(NAME_PATTERN, "Use letters, spaces, hyphens, or apostrophes")
       .required("First name is required"),
     lastName: yup
       .string()
       .trim()
       .min(2, "Last name must be at least 2 characters")
-      .max(60, "Last name must be at most 60 characters")
+      .max(80, "Last name must be at most 80 characters")
       .matches(NAME_PATTERN, "Use letters, spaces, hyphens, or apostrophes")
       .required("Last name is required"),
     email: yup
@@ -59,6 +62,11 @@ export default function SignupPage() {
   const [isPasswordVisible, setIsPasswordVisible] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [registerUser] = useRegisterUserMutation();
+  const [loginUser] = useLoginUserMutation();
+  /** Set once sign-up succeeds; switches the page to the OTP step. */
+  const [pendingEmail, setPendingEmail] = useState<string | null>(null);
+  /** Kept in memory only, to sign in after the code is verified. */
+  const passwordRef = useRef("");
   const {
     register,
     handleSubmit,
@@ -78,24 +86,22 @@ export default function SignupPage() {
   const onSubmit: SubmitHandler<SignupFormValues> = async (values) => {
     setSubmitError(null);
     try {
-      /** The auth service stores one `display_name`, so send the joined pair. */
-      const displayName = `${values.firstName.trim()} ${values.lastName.trim()}`;
+      const firstName = values.firstName.trim();
+      const lastName = values.lastName.trim();
 
+      const email = values.email.trim();
       const response = await registerUser({
-        email: values.email,
+        email,
         password: values.password,
-        display_name: displayName,
-        role:"end_user"
+        display_name: `${firstName} ${lastName}`,
+        first_name: firstName,
+        last_name: lastName,
+        terms_version: TERMS_VERSION,
+        role: "end_user",
       }).unwrap();
 
-      setAuthTokensToCookies(response);
-      dispatch(
-        refreshTokenSuccess({
-          token: response.access_token,
-          refreshToken: response.refresh_token,
-        })
-      );
-      router.push("/onboarding");
+      passwordRef.current = values.password;
+      setPendingEmail(response.email || email);
     } catch (error: unknown) {
       setSubmitError(
         getErrorMessage(error, {
@@ -103,6 +109,25 @@ export default function SignupPage() {
         })
       );
     }
+  };
+
+  const handleVerified = async (verified: VerifyEmailResponse) => {
+    const tokens =
+      verified.access_token && verified.refresh_token && verified.user
+        ? (verified as LoginUserResponse)
+        : await loginUser({
+            email: pendingEmail ?? "",
+            password: passwordRef.current,
+          }).unwrap();
+    passwordRef.current = "";
+    setAuthTokensToCookies(tokens);
+    dispatch(
+      refreshTokenSuccess({
+        token: tokens.access_token,
+        refreshToken: tokens.refresh_token,
+      })
+    );
+    router.push("/onboarding");
   };
 
   return (
@@ -138,139 +163,159 @@ export default function SignupPage() {
           <section className="w-full p-4 sm:p-8 md:p-10">
             <Logo className="md:hidden" />
 
-            <h2 className="mt-6 text-3xl font-semibold leading-tight text-white md:mt-0">
-              Create Account
-            </h2>
-            <p className="mt-2 max-w-sm text-base leading-6 text-[#9da8bf]">
-              Sign up to unlock your interactive DJ experience.
-            </p>
-
-            <form className="mt-8 space-y-5" onSubmit={handleSubmit(onSubmit)}>
-              {submitError && (
-                <p
-                  role="alert"
-                  className="rounded-lg border border-[#f87171]/50 bg-[#3c1f2a]/60 px-3 py-2 text-sm text-[#fecaca]"
-                >
-                  {submitError}
-                </p>
-              )}
-
-              <div className="grid gap-5 sm:grid-cols-2">
-                <FormInput
-                  id="firstName"
-                  label="First Name"
-                  aria-label="First name"
-                  type="text"
-                  autoComplete="given-name"
-                  placeholder="Alex"
-                  error={errors.firstName?.message}
-                  {...register("firstName")}
-                />
-
-                <FormInput
-                  id="lastName"
-                  label="Last Name"
-                  aria-label="Last name"
-                  type="text"
-                  autoComplete="family-name"
-                  placeholder="Johnson"
-                  error={errors.lastName?.message}
-                  {...register("lastName")}
-                />
-              </div>
-
-              <FormInput
-                id="email"
-                label="Email Address"
-                aria-label="Email address"
-                type="email"
-                autoComplete="email"
-                placeholder="alex@example.com"
-                error={errors.email?.message}
-                {...register("email")}
+            {pendingEmail ? (
+              <VerifyEmailStep
+                email={pendingEmail}
+                onVerified={handleVerified}
+                onBack={() => {
+                  passwordRef.current = "";
+                  setPendingEmail(null);
+                }}
               />
+            ) : (
+              <>
+                <h2 className="mt-6 text-3xl font-semibold leading-tight text-white md:mt-0">
+                  Create Account
+                </h2>
+                <p className="mt-2 max-w-sm text-base leading-6 text-[#9da8bf]">
+                  Sign up to unlock your interactive DJ experience.
+                </p>
 
-              <FormInput
-                id="password"
-                label="Password"
-                aria-label="Password"
-                type={isPasswordVisible ? "text" : "password"}
-                autoComplete="new-password"
-                placeholder="••••••••"
-                error={errors.password?.message}
-                rightAdornment={
+                <form
+                  className="mt-8 space-y-5"
+                  onSubmit={handleSubmit(onSubmit)}
+                >
+                  {submitError && (
+                    <p
+                      role="alert"
+                      className="rounded-lg border border-[#f87171]/50 bg-[#3c1f2a]/60 px-3 py-2 text-sm text-[#fecaca]"
+                    >
+                      {submitError}
+                    </p>
+                  )}
+
+                  <div className="grid gap-5 sm:grid-cols-2">
+                    <FormInput
+                      id="firstName"
+                      label="First Name"
+                      aria-label="First name"
+                      type="text"
+                      autoComplete="given-name"
+                      placeholder="Alex"
+                      error={errors.firstName?.message}
+                      {...register("firstName")}
+                    />
+
+                    <FormInput
+                      id="lastName"
+                      label="Last Name"
+                      aria-label="Last name"
+                      type="text"
+                      autoComplete="family-name"
+                      placeholder="Johnson"
+                      error={errors.lastName?.message}
+                      {...register("lastName")}
+                    />
+                  </div>
+
+                  <FormInput
+                    id="email"
+                    label="Email Address"
+                    aria-label="Email address"
+                    type="email"
+                    autoComplete="email"
+                    placeholder="alex@example.com"
+                    error={errors.email?.message}
+                    {...register("email")}
+                  />
+
+                  <FormInput
+                    id="password"
+                    label="Password"
+                    aria-label="Password"
+                    type={isPasswordVisible ? "text" : "password"}
+                    autoComplete="new-password"
+                    placeholder="••••••••"
+                    error={errors.password?.message}
+                    rightAdornment={
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setIsPasswordVisible((current) => !current)
+                        }
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-lg text-[#6e7893]"
+                        aria-label={
+                          isPasswordVisible ? "Hide password" : "Show password"
+                        }
+                      >
+                        {isPasswordVisible ? "🙈" : "👁"}
+                      </button>
+                    }
+                    {...register("password")}
+                  />
+
+                  <div>
+                    <label
+                      htmlFor="acceptedTerms"
+                      className="flex items-start gap-3 text-sm leading-6 text-[#9da8bf]"
+                    >
+                      <input
+                        id="acceptedTerms"
+                        type="checkbox"
+                        className={cn(
+                          "mt-1 h-4 w-4 shrink-0 accent-[#7d5ef5]",
+                          errors.acceptedTerms
+                            ? "outline outline-[#f87171]"
+                            : ""
+                        )}
+                        {...register("acceptedTerms")}
+                      />
+                      <span>
+                        I agree to the{" "}
+                        <Link
+                          href="/terms"
+                          className="font-medium text-[#7d66ff] underline-offset-2 hover:underline"
+                        >
+                          Terms &amp; Conditions
+                        </Link>{" "}
+                        and{" "}
+                        <Link
+                          href="/terms#privacy"
+                          className="font-medium text-[#7d66ff] underline-offset-2 hover:underline"
+                        >
+                          Privacy Policy
+                        </Link>
+                        .
+                      </span>
+                    </label>
+                    {errors.acceptedTerms ? (
+                      <p className="mt-1 text-sm text-[#fca5a5]">
+                        {errors.acceptedTerms.message}
+                      </p>
+                    ) : null}
+                  </div>
+
+                  <FormButton
+                    type="submit"
+                    disabled={isSubmitting}
+                    className="bg-gradient-to-r from-[#8a63ff] to-[#6f56f3] text-base hover:from-[#9b7bff] hover:to-[#7b66ff]"
+                  >
+                    {isSubmitting ? "Creating account..." : "Create Account"}
+                  </FormButton>
+                </form>
+
+                <p className="mt-7 text-center text-sm text-[#8b95ad]">
+                  Already have an account?{" "}
                   <button
                     type="button"
-                    onClick={() => setIsPasswordVisible((current) => !current)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-lg text-[#6e7893]"
-                    aria-label={
-                      isPasswordVisible ? "Hide password" : "Show password"
-                    }
+                    onClick={() => router.push("/login")}
+                    className="text-sm font-medium text-[#7d66ff] transition hover:text-[#9a86ff]"
                   >
-                    {isPasswordVisible ? "🙈" : "👁"}
+                    Log in
                   </button>
-                }
-                {...register("password")}
-              />
-
-              <div>
-                <label
-                  htmlFor="acceptedTerms"
-                  className="flex items-start gap-3 text-sm leading-6 text-[#9da8bf]"
-                >
-                  <input
-                    id="acceptedTerms"
-                    type="checkbox"
-                    className={cn(
-                      "mt-1 h-4 w-4 shrink-0 accent-[#7d5ef5]",
-                      errors.acceptedTerms ? "outline outline-[#f87171]" : ""
-                    )}
-                    {...register("acceptedTerms")}
-                  />
-                  <span>
-                    I agree to the{" "}
-                    <Link
-                      href="/terms"
-                      className="font-medium text-[#7d66ff] underline-offset-2 hover:underline"
-                    >
-                      Terms &amp; Conditions
-                    </Link>{" "}
-                    and{" "}
-                    <Link
-                      href="/terms#privacy"
-                      className="font-medium text-[#7d66ff] underline-offset-2 hover:underline"
-                    >
-                      Privacy Policy
-                    </Link>
-                    .
-                  </span>
-                </label>
-                {errors.acceptedTerms ? (
-                  <p className="mt-1 text-sm text-[#fca5a5]">
-                    {errors.acceptedTerms.message}
-                  </p>
-                ) : null}
-              </div>
-
-              <FormButton
-                type="submit"
-                disabled={isSubmitting}
-                className="bg-gradient-to-r from-[#8a63ff] to-[#6f56f3] text-base hover:from-[#9b7bff] hover:to-[#7b66ff]"
-              >
-                {isSubmitting ? "Creating account..." : "Create Account"}
-              </FormButton>
-            </form>
-
-            <p className="mt-7 text-center text-sm text-[#8b95ad]">
-              Already have an account?{" "}
-              <button
-                type="button"
-                onClick={() => router.push("/login")}
-                className="text-sm font-medium text-[#7d66ff] transition hover:text-[#9a86ff]"
-              >
-                Log in
-              </button>
-            </p>
+                </p>
+              </>
+            )}
           </section>
         </div>
       </div>

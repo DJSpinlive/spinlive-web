@@ -6,6 +6,10 @@ export interface User {
   /** Public handle — present when `/me` returns it. */
   username?: string | null;
   display_name: string | null;
+  first_name?: string | null;
+  last_name?: string | null;
+  /** ISO date (YYYY-MM-DD); must be in the past. */
+  date_of_birth?: string | null;
   bio: string | null;
   avatar_url: string | null;
   role: "end_user" | "dj" | "admin";
@@ -18,6 +22,10 @@ export interface User {
   rating_count: number;
   status: string; // e.g. 'active'
   availability: AvailabilityWindow[];
+  is_public?: boolean;
+  onboarding_completed?: boolean;
+  terms_version?: string | null;
+  terms_accepted_at?: string | null;
   bookings_created_count?: number;
   following_count?: number;
   tips_sent_count?: number;
@@ -31,8 +39,11 @@ export interface User {
 }
 
 export interface UpdateUserRequest {
-  username?: string;
   display_name?: string;
+  first_name?: string | null;
+  last_name?: string | null;
+  /** ISO date (YYYY-MM-DD); `null` clears it. */
+  date_of_birth?: string | null;
   bio?: string;
   genres?: string[];
   hourly_rate?: number;
@@ -61,6 +72,21 @@ export interface DiscoverDjsParams {
 /** Normalized client shape — API returns either a raw DJ array or `{ djs: [...] }` (no pagination metadata). */
 export interface DiscoverDjsResponse {
   djs: User[];
+}
+
+/** `/users/djs/recommended` row: a DJ ranked by genre overlap with the viewer. */
+export interface MatchedDj extends User {
+  match_score: number;
+  shared_genres: string[];
+}
+
+export interface RecommendedDjsParams {
+  limit?: number; // maximum: 100
+  offset?: number; // minimum: 0
+}
+
+export interface AcceptTermsRequest {
+  version: string;
 }
 
 export interface Genre {

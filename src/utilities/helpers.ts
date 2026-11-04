@@ -15,7 +15,8 @@ const DEFAULT_FALLBACK_MESSAGE = "Something went wrong.";
 
 /**
  * Human-readable message from RTK Query `.unwrap()` errors and similar API errors.
- * Supports `{ message: string }` and FastAPI-style `{ detail: [{ msg: string }] }`.
+ * Supports `{ message }` and FastAPI-style `{ detail: string }`,
+ * `{ detail: { message } }` and `{ detail: [{ msg }] }`.
  */
 export function getErrorMessage(
   err: unknown,
@@ -34,12 +35,28 @@ export function getErrorMessage(
     return fallbackMsg;
   }
 
-  const body = data as { message?: string; detail?: { msg?: string }[] };
+  const body = data as {
+    message?: string;
+    detail?: string | { message?: string } | { msg?: string }[];
+  };
   if (typeof body.message === "string" && body.message) {
     return body.message;
   }
 
-  const first = body.detail?.[0];
+  const { detail } = body;
+  if (typeof detail === "string" && detail) {
+    return detail;
+  }
+  if (
+    detail &&
+    typeof detail === "object" &&
+    !Array.isArray(detail) &&
+    typeof detail.message === "string"
+  ) {
+    return detail.message;
+  }
+
+  const first = Array.isArray(detail) ? detail[0] : undefined;
   if (first && typeof first.msg === "string") {
     return first.msg;
   }
